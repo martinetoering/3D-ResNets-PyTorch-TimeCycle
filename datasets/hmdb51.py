@@ -6,6 +6,7 @@ import math
 import functools
 import json
 import copy
+import numpy as np
 
 from dataset_utils import load_value_file
 

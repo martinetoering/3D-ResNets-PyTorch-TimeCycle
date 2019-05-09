@@ -20,9 +20,8 @@ def im_to_torch(img):
 def load_image(img_path):
     # H x W x C => C x H x W
     img = cv2.imread(img_path)
-    #if img is None:
-    #    print("IMAGE PATH:", img_path)
-    #print("LOAD IMAGE:", img.shape)
+    if img is None:
+        print("None image path:", img_path)
     img = img.astype(np.float32)
     img = img / 255.0
     img = img[:,:,::-1]

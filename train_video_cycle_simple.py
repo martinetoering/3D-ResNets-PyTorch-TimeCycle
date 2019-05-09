@@ -320,6 +320,8 @@ def save_checkpoint(state, checkpoint='checkpoint', filename='checkpoint.pth'):
     for key in model_state.keys():
         if "encoderVideo" in key:
             new_model_state[key.replace("encoderVideo.", "")] = model_state[key]
+        else:
+            new_model_state[key] = model_state[key]
 
     state['state_dict'] = new_model_state
 

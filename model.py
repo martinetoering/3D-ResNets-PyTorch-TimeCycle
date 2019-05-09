@@ -171,24 +171,21 @@ def generate_model(opt):
             #assert opt.arch == pretrain['arch']
 
             pretrained_dict = pretrain['state_dict']
-            # print("PRETRAIN BEFORE:", pretrained_dict.keys())
+            print("PRETRAIN dict", sorted(pretrained_dict.keys()))
             model_dict = model.state_dict()
+            print("MODEL dict", sorted(model_dict.keys()))
+            print("Difference", set(sorted(pretrained_dict.keys()))-set(sorted(model_dict.keys())))
 
             #print("Current model:", model.state_dict().keys())
             #print("Pretrained model:", pretrain['state_dict'].keys())
             
 
             # 1. filter out unnecessary keys
-            #pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
+            pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
             # 2. overwrite entries in the existing state dict
-
-
-            pretrained_dict.update(model_dict)
-            #print("Pretrained model after:", len(model_dict.keys()))
+            model_dict.update(pretrained_dict)
             # 3. load the new state dict
-            model.load_state_dict(pretrained_dict)
-
-            
+            model.load_state_dict(pretrained_dict, strict=False)
 
             
             model.module.fc = nn.Linear(model.module.fc.in_features,

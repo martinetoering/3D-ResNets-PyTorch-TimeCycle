@@ -163,7 +163,7 @@ def parse_opts():
 
     parser.add_argument(
         '--root_path',
-        default='~/data',
+        default='/home/martine/data',
         type=str,
         help='Root directory path of data')
     parser.add_argument(

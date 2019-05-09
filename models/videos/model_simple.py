@@ -38,7 +38,7 @@ class CycleTime(nn.Module):
         #print("RESNET 50:", resnet_50)
 
 
-        self.encoderVideo = inflated_resnet.InflatedResNet(copy.deepcopy(resnet))
+        self.module = inflated_resnet.InflatedResNet(copy.deepcopy(resnet))
         #print("INFLATED RESNET 18:", self.encoderVideo)
 
         self.detach_network = detach_network
@@ -170,7 +170,7 @@ class CycleTime(nn.Module):
 
         # patch feature
         x = x.transpose(1, 2)
-        x_pre = self.encoderVideo(x)
+        x_pre = self.module(x)
 
         if self.detach_network and can_detach:
             x_pre = x_pre.detach()
