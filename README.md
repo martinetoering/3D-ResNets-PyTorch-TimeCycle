@@ -1,4 +1,8 @@
+Run experiment
+
+```
 python3 3D-ResNets-PyTorch-TimeCycle/main.py --annotation_path hmdb51_1.json && python3 3D-ResNets-PyTorch-TimeCycle/main.py --annotation_path hmdb51_2.json && python3 3D-ResNets-PyTorch-TimeCycle/main.py --annotation_path hmdb51_3.json 
+```
 
 
 
