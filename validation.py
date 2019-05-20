@@ -17,12 +17,13 @@ def val_epoch(epoch, params, data_loader, model, criterion, opt, logger):
     accuracies = AverageMeter()
 
     end_time = time.time()
-    for i, (imgs, img, patch2, theta, meta, inputs, targets) in enumerate(data_loader):
+    for i, (inputs, targets) in enumerate(data_loader):
+
         data_time.update(time.time() - end_time)
 
         if not opt.no_cuda:
             targets = targets.cuda(async=True)
-        inputs = Variable(inputs, volatile=True)
+        inputs = Variable(inputs.cuda(), volatile=True)
         targets = Variable(targets, volatile=True)
         _, _, _, outputs = model.forward_base(inputs)
         loss = criterion(outputs, targets)

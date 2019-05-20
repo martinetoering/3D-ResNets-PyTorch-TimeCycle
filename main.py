@@ -98,28 +98,6 @@ def get_params(opt):
 
     return params, state
 
-def save_checkpoint(state, checkpoint='checkpoint', filename='checkpoint.pth'):
-    new_model_state = {}
-    model_state = state['state_dict']
-    
-    for key in model_state.keys():
-        if "encoderVideo" in key:
-            new_model_state[key.replace("encoderVideo.", "")] = model_state[key]
-        else:
-            new_model_state[key] = model_state[key]
-
-    state['state_dict'] = new_model_state
-
-    epoch = state['epoch']
-    filename = 'checkpoint_' + str(epoch) + '.pth'
-    filepath = os.path.join(checkpoint, filename)
-    torch.save(state, filepath)
-
-def set_bn_eval(m):
-    classname = m.__class__.__name__
-    if classname.find('BatchNorm') != -1:
-      m.eval()
-
 
 if __name__ == '__main__':
 
@@ -142,12 +120,8 @@ if __name__ == '__main__':
         folder = opt.result_path
         opt.result_path = os.path.join(opt.root_path, opt.result_path + "_" + split)
         print("Result path:", opt.result_path)
-        opt.path_checkpoint = os.path.join(opt.root_path, opt.path_checkpoint + "_" + split)
-        print("Path checkpoint:", opt.path_checkpoint)
         if not os.path.isdir(opt.result_path):
             os.mkdir(opt.result_path)
-        if not os.path.isdir(opt.path_checkpoint):
-            os.mkdir(opt.path_checkpoint)
         if opt.resume_path:
             opt.resume_path = os.path.join(opt.root_path, opt.resume_path)
         if opt.pretrain_path:
@@ -156,7 +130,6 @@ if __name__ == '__main__':
     params, state = get_params(opt)
 
     print("Result path:", opt.result_path)
-    print("Checkpoint path:", opt.result_path)
 
     opt.scales = [opt.initial_scale]
     for i in range(1, opt.n_scales):
@@ -198,7 +171,7 @@ if __name__ == '__main__':
     if not opt.no_cuda:
         criterion = criterion.cuda()
 
-    if opt.no_mean_norm and not opt.std_norm:
+    if not opt.mean_norm and not opt.std_norm:
         norm_method = Normalize([0, 0, 0], [1, 1, 1])
         print("Norm method 0")
     elif not opt.std_norm:
@@ -208,8 +181,8 @@ if __name__ == '__main__':
         norm_method = Normalize(opt.mean, opt.std)
         print("Norm method 2")
 
-    print('Weight_decay: ' + str(opt.u_wd))
-    print('Beta1: ' + str(opt.u_momentum))
+    print('Weight_decay: ' + str(opt.weight_decay))
+    print('Beta1: ' + str(opt.momentum))
 
     print("\n")
     print("LOADING PRETRAIN/RESUME AND LOGGER")
@@ -217,14 +190,14 @@ if __name__ == '__main__':
 
     if opt.optimizer == 'adam':
         optimizer = optim.Adam(model.parameters(), 
-                    lr=opt.u_lr, 
-                    betas=(opt.u_momentum, 0.999), 
-                    weight_decay=opt.u_wd)
+                    lr=opt.learning_rate, 
+                    betas=(opt.momentum, 0.999), 
+                    weight_decay=opt.weight_decay)
         print("Adam")
     else:
         optimizer = optim.SGD(model.parameters(), 
-                          lr=opt.u_lr, 
-                          weight_decay=opt.u_wd, 
+                          lr=opt.learning_rate, 
+                          weight_decay=opt.weight_decay, 
                           momentum=0.95
                           #dampening=0.9,
                           #nesterov=False
@@ -237,19 +210,18 @@ if __name__ == '__main__':
     if opt.pretrain_path:
         # Load checkpoint.
         print('Loading pretrained model {}'.format(opt.pretrain_path))
-        assert os.path.isfile(opt.pretrain_path), 'Error: no checkpoint directory found!'
+        assert os.path.isfile(opt.pretrain_path), 'No pretrain directory found'
         checkpoint = torch.load(opt.pretrain_path)
 
         partial_load(checkpoint['state_dict'], model)
 
         del checkpoint
 
-    title = 'videonet'
+
     if opt.resume_path:
         # Load checkpoint.
         print('Loading checkpoint {}'.format(opt.resume_path))
-        assert os.path.isfile(opt.resume_path), 'Error: no checkpoint directory found!'
-        opt.path_checkpoint = os.path.dirname(opt.resume_path)
+        assert os.path.isfile(opt.resume_path), 'No checkpoint directory found'
         checkpoint = torch.load(opt.resume_path)
         assert opt.arch == checkpoint['arch']
         opt.begin_epoch = checkpoint['epoch']
@@ -258,18 +230,7 @@ if __name__ == '__main__':
         if not opt.no_train:
             optimizer.load_state_dict(checkpoint['optimizer'])
 
-        # logger = Logger(os.path.join(opt.path_checkpoint, 'log-resume.txt'), title=title)
-        # logger.set_names(['Learning Rate', 'Train Loss', 'Theta Loss', 'Theta Skip Loss'])
-
-
         del checkpoint
-    
-
-        
-        # logger = Logger(os.path.join(opt.path_checkpoint, 'log.txt'), title=title)
-        # logger.set_names(['Learning Rate', 'Train Loss', 'Theta Loss', 'Theta Skip Loss'])
-
-  
 
     if not opt.no_train:
 
@@ -278,22 +239,22 @@ if __name__ == '__main__':
         print("\n")
 
 
-        assert opt.train_crop in ['random', 'corner', 'center']
-        if opt.train_crop == 'random':
-            crop_method = MultiScaleRandomCrop(opt.scales, opt.sample_size)
-        elif opt.train_crop == 'corner':
-            crop_method = MultiScaleCornerCrop(opt.scales, opt.sample_size)
-        elif opt.train_crop == 'center':
-            crop_method = MultiScaleCornerCrop(
-                opt.scales, opt.sample_size, crop_positions=['c'])
+        # assert opt.train_crop in ['random', 'corner', 'center']
+        # if opt.train_crop == 'random':
+        #     crop_method = MultiScaleRandomCrop(opt.scales, opt.sample_size)
+        # elif opt.train_crop == 'corner':
+        #     crop_method = MultiScaleCornerCrop(opt.scales, opt.sample_size)
+        # elif opt.train_crop == 'center':
+        #     crop_method = MultiScaleCornerCrop(
+        #         opt.scales, opt.sample_size, crop_positions=['c'])
 
-        spatial_transform = Compose([
-            crop_method,
-            RandomHorizontalFlip(),
-            ToTensor(opt.norm_value), norm_method
-        ])
+        # spatial_transform = Compose([
+        #     crop_method,
+        #     RandomHorizontalFlip(),
+        #     ToTensor(opt.norm_value), norm_method
+        # ])
 
-        temporal_transform = TemporalRandomCrop(opt.sample_duration)
+        # temporal_transform = TemporalRandomCrop(opt.sample_duration)
         target_transform = ClassLabel()
 
         geometric_transform = GeometricTnf(
@@ -309,8 +270,6 @@ if __name__ == '__main__':
             opt.annotation_path,
             'training',
             frame_gap=opt.frame_gap,
-            spatial_transform=spatial_transform,
-            temporal_transform=temporal_transform,
             target_transform=target_transform,
             geometric_transform=geometric_transform)
 
@@ -448,14 +407,17 @@ if __name__ == '__main__':
 
         target_transform = VideoID()
 
+        subset = "validation"
+
         test_data =  HMDB51(
+            params,
             opt.video_path,
             opt.annotation_path,
             subset,
-            0,
-            spatial_transform,
-            temporal_transform,
-            target_transform,
+            n_samples_for_each_video=0,
+            spatial_transform=spatial_transform,
+            temporal_transform=temporal_transform,
+            target_transform=target_transform,
             sample_duration=opt.sample_duration)
 
         test_loader = torch.utils.data.DataLoader(
