@@ -92,13 +92,80 @@ class Bottleneck(nn.Module):
 
         return out
 
+class Multi_output_model(nn.Module):
+
+    def __init__(self, 
+                 model_core,
+                 block, 
+                 layers, 
+                 num_classes=1000):
+
+        self.inplanes = 64
+
+        super(Multi_output_model, self).__init__()
+
+        self.resnet_model = model_core
+        
+        self.head_0 = nn.Sequential(
+        self._make_layer(block, 256, layers[2], stride=1),
+        self._make_layer(block, 512, layers[3], stride=2),
+        nn.AvgPool2d(7, stride=1),
+        nn.Linear(512 * block.expansion, num_classes) )
+
+        self.head_1 = nn.Sequential(
+        self._make_layer(block, 256, layers[2], stride=2),
+        self._make_layer(block, 512, layers[3], stride=2),
+        nn.AvgPool2d(7, stride=1),
+        nn.Linear(512 * block.expansion, num_classes) )
+
+        for m in self.head_0.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal(m.weight, mode='fan_out')
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant(m.weight, 1)
+                nn.init.constant(m.bias, 0)
+
+        for m in self.head_1.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal(m.weight, mode='fan_out')
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant(m.weight, 1)
+                nn.init.constant(m.bias, 0)
+
+    def _make_layer(self, block, planes, blocks, stride=1):
+        downsample = None
+        if stride != 1 or self.inplanes != planes * block.expansion:
+            downsample = nn.Sequential(
+                nn.Conv2d(self.inplanes, planes * block.expansion,
+                          kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(planes * block.expansion),
+            )
+
+        layers = []
+        layers.append(block(self.inplanes, planes, stride, downsample))
+        self.inplanes = planes * block.expansion
+        for i in range(1, blocks):
+            layers.append(block(self.inplanes, planes))
+
+        return nn.Sequential(*layers)
+
+    def forward(self, x):
+        x = self.resnet_model(x)
+        
+
+
+        return head_0, head_1
+
 
 class ResNet(nn.Module):
 
     def __init__(self, 
                  block, 
                  layers, 
+                 sample_duration=4,
+                 sample_size=240,
                  num_classes=1000):
+
         self.inplanes = 64
         super(ResNet, self).__init__()
         self.conv1 = nn.Conv2d(
@@ -114,8 +181,11 @@ class ResNet(nn.Module):
         self.layer1 = self._make_layer(block, 64, layers[0])
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
         self.layer3 = self._make_layer(block, 256, layers[2], stride=1)
+        self.layer3_b = self._make_layer(block, 256, layers[2], stride=2)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
-        self.avgpool = nn.AvgPool2d(7, stride=1)
+        last_duration = int(math.ceil(sample_duration / 16))
+        last_size = int(math.ceil(sample_size / 32))
+        self.avgpool = nn.AvgPool2d(last_size, stride=1)
         self.fc = nn.Linear(512 * block.expansion, num_classes)
 
         for m in self.modules():
@@ -143,6 +213,8 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
+
+        print("IS THIS FORWARD USED?!?!?!?!?!?!")
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -150,14 +222,37 @@ class ResNet(nn.Module):
 
         x = self.layer1(x)
         x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
 
-        x = self.avgpool(x)
-        x = x.view(x.size(0), -1)
-        x = self.fc(x)
+        # x = self.layer3(x)
+        # x = self.layer4(x)
 
-        return x
+        # x = self.avgpool(x)
+        # x = x.view(x.size(0), -1)
+        # x = self.fc(x)
+
+        head_0 = self.layer3(x)
+        head_0= self.layer4(head_0)
+
+        head_0 = self.avgpool(head_0)
+        head_0 = head_0.view(head_0.size(0), -1)
+        head_0 = self.fc(head_0)
+
+
+        head_1 = self.layer3_b(x)
+        head_1 = self.layer4(head_1)
+
+        head_1 = self.avgpool(head_1)
+        head_1 = head_1.view(head_1.size(0), -1)
+        head_1 = self.fc(head_1)
+
+        return head_0, head_1
+
+
+def multi_output_model(core_model, pretrained=False, **kwargs):
+    model = Multi_output_model(core_model, BasicBlock, [2, 2, 2, 2], **kwargs)
+    if pretrained:
+        model.load_state_dict(model_zoo.load_url(model_urls['resnet18']))
+    return model
 
 
 def resnet18(pretrained=False, **kwargs):

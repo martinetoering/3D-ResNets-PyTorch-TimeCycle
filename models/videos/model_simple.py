@@ -25,31 +25,44 @@ import sys
 
 class CycleTime(nn.Module):
 
-    def __init__(self, class_num=8, dim_in=2048, trans_param_num=3, detach_network=False, pretrained=True, temporal_out=4, T=None, hist=1):
+    def __init__(self, 
+                 class_num=8, 
+                 dim_in=2048, 
+                 trans_param_num=3, 
+                 detach_network=False, 
+                 pretrained=False, 
+                 temporal_out=4, 
+                 T=None, 
+                 hist=1):
+
         super(CycleTime, self).__init__()
 
+        print("\n")
+        print("MODEL")
+        print("\n")
+
         dim = 512
-        #print("Pretrained imagenet:", pretrained)
+        print("Pretrained Imagenet:", pretrained)
 
-        resnet = resnet_res4s1.resnet18(pretrained=pretrained)
-        #print("RESNET 18:", resnet)
-
-        #resnet_50 = resnet_res4s1.resnet50(pretrained=pretrained)
-        #print("RESNET 50:", resnet_50)
-
-
+        resnet = resnet_res4s1.resnet50(pretrained=pretrained)
+        #resnet = resnet_res4s1.multi_output_model(resnet, pretrained=pretrained)
         self.module = inflated_resnet.InflatedResNet(copy.deepcopy(resnet))
-        #print("INFLATED RESNET 18:", self.encoderVideo)
+
+        #print(self.module)
 
         self.detach_network = detach_network
         self.hist = hist
 
+        print("Detach network:", self.detach_network)
+        print("Hist:", hist)
 
         self.div_num = 512
+
         self.T = self.div_num**-.5 if T is None else T
+
         print('self.T:', self.T)
 
-        self.afterconv1 = nn.Conv3d(256, 18, kernel_size=1, bias=False)
+        self.afterconv1 = nn.Conv3d(1024, 18, kernel_size=1, bias=False)
 
         self.spatial_out1 = 30
         self.spatial_out2 = 10
@@ -71,32 +84,46 @@ class CycleTime(nn.Module):
         self.maxpool2d = nn.MaxPool2d(2, stride=2)
 
 
-        # initialization
+        # Initialization
 
         nn.init.kaiming_normal(self.afterconv1.weight, mode='fan_out')
         nn.init.kaiming_normal(self.afterconv3_trans.weight, mode='fan_out')
         nn.init.kaiming_normal(self.afterconv4_trans.weight, mode='fan_out')
 
-        # assuming no fc pre-training
+        # Assuming no fc pre-training
+
         for m in self.modules():
             if isinstance(m, nn.Linear):
                 m.weight.data.normal_(0, 0.01)
                 m.bias.data.zero_()
 
-        # transformation
-        self.geometricTnf = GeometricTnfAffine(geometric_model='affine',
-                                         tps_grid_size=3,
-                                         tps_reg_factor=0.2,
-                                         out_h=self.spatial_out2, out_w=self.spatial_out2,
-                                         offset_factor=227/210)
+        # Transformation
+        self.geometricTnf = GeometricTnfAffine(
+                    geometric_model='affine',
+                    tps_grid_size=3,
+                    tps_reg_factor=0.2,
+                    out_h=self.spatial_out2, 
+                    out_w=self.spatial_out2,
+                    offset_factor=227/210)
 
         xs = np.linspace(-1,1,80)
         xs = np.meshgrid(xs, xs)
         xs = np.stack(xs, 2)
         self.xs = xs
 
-        self.criterion_inlier = WeakInlierCountPool(geometric_model='affine', tps_grid_size=3, tps_reg_factor=0.2, h_matches=30, w_matches=30, use_conv_filter=False, dilation_filter=0, normalize_inlier_count=True)
-        self.criterion_synth  = TransformedGridLoss(use_cuda=True, geometric_model='affine')
+        self.criterion_inlier = WeakInlierCountPool(
+                    geometric_model='affine', 
+                    tps_grid_size=3, 
+                    tps_reg_factor=0.2, 
+                    h_matches=30, 
+                    w_matches=30, 
+                    use_conv_filter=False, 
+                    dilation_filter=0, 
+                    normalize_inlier_count=True)
+
+        self.criterion_synth  = TransformedGridLoss(
+                    use_cuda=True, 
+                    geometric_model='affine')
 
 
     def compute_corr_softmax(self, patch_feat1, r50_feat2, detach_corrfeat=False):
@@ -120,7 +147,7 @@ class CycleTime(nn.Module):
         corrfeat  = corrfeat.view(corrfeat.size(0), T * self.spatial_out1 * self.spatial_out1, self.spatial_out2, self.spatial_out2)
 
         return corrfeat
-    #
+    
     def compute_corr_softmax2(self, patch_feat1, r50_feat2):
         T = r50_feat2.shape[2]
 
@@ -168,9 +195,20 @@ class CycleTime(nn.Module):
     def forward_base(self, x, contiguous=False, can_detach=True):
         # import pdb; pdb.set_trace()
 
-        # patch feature
+        # Patch feature
+
+        x_class = None
+
+        # print("\n")
+        # print("FORWARD BASE")
+        # print("\n")
+
         x = x.transpose(1, 2)
-        x_pre = self.module(x)
+
+        if x.size()[2] == 4:
+            x_pre, x_class = self.module(x)
+        else:
+            x_pre = self.module(x)
 
         if self.detach_network and can_detach:
             x_pre = x_pre.detach()
@@ -184,7 +222,7 @@ class CycleTime(nn.Module):
 
         x_norm = F.normalize(x, p=2, dim=1)
 
-        return x, x_pre, x_norm
+        return x, x_pre, x_norm, x_class
 
     def compute_transform_img_to_patch(self, query, base, temporal_out=1, detach_corrfeat=False):
 
@@ -205,31 +243,57 @@ class CycleTime(nn.Module):
         return corrfeat, corrfeat_mat, corrfeat_trans, trans_theta
 
     def forward(self, ximg1, patch2, img2, theta):
+            
+        # print("\n")
+        # print("FORWARD")
+        # print("\n")
+
         B, T = ximg1.shape[:2]
+
+        
         videoclip1  = ximg1
 
-        # base features
-        r50_feat1, r50_feat1_pre, r50_feat1_norm = self.forward_base(videoclip1)
+        # Base features
+        
+        r50_feat1, r50_feat1_pre, r50_feat1_norm, r50_class = self.forward_base(
+                                                   videoclip1)
 
         # target patch feature
-        patch2_feat2, patch2_feat2_pre, patch_feat2_norm = self.forward_base(patch2, contiguous=True)
+        
+        patch2_feat2, patch2_feat2_pre, patch_feat2_norm, _ = self.forward_base(
+                                                   patch2, 
+                                                   contiguous=True)
 
         # target image feature
-        img_feat2, img_feat2_pre, img_feat2_norm = self.forward_base(img2, contiguous=True, can_detach=False)
+        img_feat2, img_feat2_pre, img_feat2_norm, _ = self.forward_base(
+                                                   img2, 
+                                                   contiguous=True, 
+                                                   can_detach=False)
 
 
         # base features to crop with transformations
+
         r50_feat1_transform = r50_feat1.transpose(1, 2)
         channels = r50_feat1_transform.size(2)
         r50_feat1_transform = r50_feat1_transform.contiguous()
 
         # add original code
-        corrfeat1, corrfeat_trans_matrix2, corrfeat_trans1, trans_out2 = self.compute_transform_img_to_patch(patch_feat2_norm, r50_feat1_norm, temporal_out=self.temporal_out)
+        corrfeat1, corrfeat_trans_matrix2, corrfeat_trans1, trans_out2 = self.compute_transform_img_to_patch(
+                                        patch_feat2_norm, 
+                                        r50_feat1_norm, 
+                                        temporal_out=self.temporal_out)
 
         bs2 = corrfeat_trans1.size(0)
 
-        r50_feat1_transform_ori = r50_feat1_transform.view(bs2, channels, self.spatial_out1, self.spatial_out1)
-        r50_feat1_transform_ori = self.geometricTnf(r50_feat1_transform_ori, trans_out2)
+        r50_feat1_transform_ori = r50_feat1_transform.view(
+                                        bs2, 
+                                        channels, 
+                                        self.spatial_out1, 
+                                        self.spatial_out1)
+
+        r50_feat1_transform_ori = self.geometricTnf(
+                                        r50_feat1_transform_ori, 
+                                        trans_out2)
 
         # r50_feat1_transform_ori = r50_feat1_transform_ori.transpose(1, 2)
 
@@ -347,7 +411,10 @@ class CycleTime(nn.Module):
         back_trans_feats = back_trans_feats.view(-1, *back_trans_feats.shape[2:])
         skip_trans, skip_corrfeat_mat = skip_prediction(img_feat2_norm, back_trans_feats)
 
-        return outputs[:2], patch2_feat2, theta, trans_out2, trans_out3, skip_trans, skip_corrfeat_mat, corrfeat_trans_matrix2
+        return r50_class, (outputs[:2], patch2_feat2, theta, trans_out2, trans_out3, skip_trans, skip_corrfeat_mat, corrfeat_trans_matrix2)
+        
+        
+        
 
 
     def loss(self, outputs, patch_feat, theta, trans_out2, trans_out3, skip_trans, skip_corrfeat_mat, corrfeat_trans_matrix2):

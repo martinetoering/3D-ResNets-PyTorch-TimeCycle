@@ -10,23 +10,12 @@ def str_to_bool(v):
 
 def parse_opts():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '-up', '--unsupervised_pretrain',
-        action='store_true',
-        help='If true, unsupervised pretraining on hmdb51 is performed.')
 
-    # TimeCycle 
 
-        # Datasets
-    parser.add_argument(
-        '-d', '--data', 
-        default='~/data/hmdb_videos/jpg',
-        help='path to dataset', 
-        type=str)
     parser.add_argument(
         '-l', 
         '--list', 
-        default='~/data/hmdb_1.txt',
+        default='hmdb_1.txt',
         help='path to video list', 
         type=str)
     parser.add_argument(
@@ -36,17 +25,10 @@ def parse_opts():
         type=int, 
         metavar='N',
         help='number of data loading workers (default: 4)')
-    # Optimization options
-    parser.add_argument(
-        '--epochs', 
-        default=30, 
-        type=int, 
-        metavar='N',
-        help='number of total epochs to run')
     parser.add_argument(
         '--u_lr', 
         '--unsupervised_learning_rate', 
-        default=2e-4, 
+        default=2e-3, 
         type=float,
         metavar='LR', 
         help='initial learning rate')
@@ -59,7 +41,7 @@ def parse_opts():
     parser.add_argument(
         '--u_wd',
         '--unsupervised_weight_decay',
-        default=0.0, 
+        default=1e-4, 
         type=float,
         metavar='W', 
         help='weight decay (default: 1e-4)')
@@ -67,33 +49,17 @@ def parse_opts():
     parser.add_argument(
         '-pc', 
         '--path_checkpoint', 
-        default='~/data/results_timecycle_1',
+        default='resnet50_checkpoint',
         type=str, 
         metavar='PATH',
         help='path to save checkpoint (default: checkpoint)')
-    parser.add_argument(
-        '--resume', 
-        default='', type=str, metavar='PATH',
-        help='path to latest checkpoint (default: none)')
     # Miscs
     parser.add_argument(
         '--manualSeed', type=int, help='manual seed')
-    parser.add_argument(
-        '-e', 
-        '--evaluate', 
-        dest='evaluate', 
-        action='store_true',
-        help='evaluate model on validation set')
-    parser.add_argument(
-        '--pretrained', 
-        default='', 
-        type=str, 
-        metavar='PATH',
-        help='use pre-trained model')
     #Device options
     parser.add_argument(
         '--gpu-id', 
-        default='0,1,2,3', 
+        default='0', 
         type=str,
         help='id(s) for CUDA_VISIBLE_DEVICES')
     parser.add_argument(
@@ -105,11 +71,6 @@ def parse_opts():
         type=int, 
         default=0, 
         help='manual seed')
-    parser.add_argument(
-        '--batchSize', 
-        default=36, 
-        type=int,
-        help='batchSize')
     parser.add_argument(
         '--T', 
         default=512**-.5, 
@@ -137,7 +98,6 @@ def parse_opts():
         const=True, 
         default=False,
         help='pretrained_imagenet')
-
     parser.add_argument(
         '--videoLen', 
         default=4, 
@@ -154,7 +114,7 @@ def parse_opts():
         type=int,
         help='')
     parser.add_argument(
-        '--optim', 
+        '--optimizer', 
         default='adam', 
         type=str,
         help='')
@@ -163,7 +123,7 @@ def parse_opts():
 
     parser.add_argument(
         '--root_path',
-        default='/home/martine/data',
+        default='/home/mtoering/data',
         type=str,
         help='Root directory path of data')
     parser.add_argument(
@@ -178,7 +138,7 @@ def parse_opts():
         help='Annotation file path')
     parser.add_argument(
         '--result_path',
-        default='results',
+        default='resnet50_results_resume',
         type=str,
         help='Result directory path')
     parser.add_argument(
@@ -202,12 +162,12 @@ def parse_opts():
     )
     parser.add_argument(
         '--sample_size',
-        default=112,
+        default=240,
         type=int,
         help='Height and width of inputs')
     parser.add_argument(
         '--sample_duration',
-        default=16,
+        default=4,
         type=int,
         help='Temporal duration of inputs')
     parser.add_argument(
@@ -253,7 +213,7 @@ def parse_opts():
         '--no_mean_norm',
         action='store_true',
         help='If true, inputs are not normalized by mean.')
-    parser.set_defaults(no_mean_norm=False)
+    parser.set_defaults(no_mean_norm=True)
     parser.add_argument(
         '--std_norm',
         action='store_true',
@@ -263,26 +223,21 @@ def parse_opts():
         '--nesterov', action='store_true', help='Nesterov momentum')
     parser.set_defaults(nesterov=False)
     parser.add_argument(
-        '--optimizer',
-        default='sgd',
-        type=str,
-        help='Currently only support SGD')
-    parser.add_argument(
         '--lr_patience',
         default=10,
         type=int,
         help='Patience of LR scheduler. See documentation of ReduceLROnPlateau.'
     )
     parser.add_argument(
-        '--batch_size', default=128, type=int, help='Batch Size')
+        '--batch_size', default=4, type=int, help='Batch Size')
     parser.add_argument(
         '--n_epochs',
-        default=200,
+        default=400,
         type=int,
         help='Number of total epochs to run')
     parser.add_argument(
         '--begin_epoch',
-        default=1,
+        default=0,
         type=int,
         help=
         'Training begins at this epoch. Previous trained model indicated by resume_path is loaded.'
@@ -294,11 +249,14 @@ def parse_opts():
         help='Number of validation samples for each activity')
     parser.add_argument(
         '--resume_path',
-        default='',
+        default='resnet50_results_hmdb51_1/save_10.pth',
         type=str,
         help='Save data (.pth) of previous training')
     parser.add_argument(
-        '--pretrain_path', default='', type=str, help='Pretrained model (.pth)')
+        '--pretrain_path', 
+        default='', 
+        type=str, 
+        help='Pretrained model (.pth)')
     parser.add_argument(
         '--ft_begin_index',
         default=0,
@@ -313,10 +271,10 @@ def parse_opts():
         '--no_val',
         action='store_true',
         help='If true, validation is not performed.')
-    parser.set_defaults(no_val=False)
+    parser.set_defaults(no_val=True)
     parser.add_argument(
-        '--test', action='store_true', help='If true, test is performed.')
-    parser.set_defaults(test=False)
+        '--no_test', action='store_true', help='If true, no test is performed.')
+    parser.set_defaults(no_test=False)
     parser.add_argument(
         '--test_subset',
         default='val',
@@ -347,7 +305,7 @@ def parse_opts():
         help='Number of threads for multi-thread loading')
     parser.add_argument(
         '--checkpoint',
-        default=10,
+        default=1,
         type=int,
         help='Trained model is saved at every this epochs.')
     parser.add_argument(
@@ -368,7 +326,7 @@ def parse_opts():
         help='(resnet | preresnet | wideresnet | resnext | densenet | ')
     parser.add_argument(
         '--model_depth',
-        default=18,
+        default=50,
         type=int,
         help='Depth of resnet (10 | 18 | 34 | 50 | 101)')
     parser.add_argument(
@@ -386,12 +344,7 @@ def parse_opts():
     parser.add_argument(
         '--manual_seed', default=1, type=int, help='Manually set random seed')
     parser.add_argument(
-        '--eval', action='store_true', help='If true, evaluation is done.')
-    # parser.add_argument(
-    #     '--top_k', 
-    #     type=int, 
-    #     default=1, 
-    #     help='Top 1 or top 5 accuracy for evaluation')
+        '--no_eval', action='store_true', help='If true, no evaluation is done.')
 
     args = parser.parse_args()
 

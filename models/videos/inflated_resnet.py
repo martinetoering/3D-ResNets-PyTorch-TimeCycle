@@ -5,8 +5,77 @@ import torch.nn as nn
 from . import inflate
 
 
+class Multi_output_model(nn.Module):
+
+    def __init__(self, 
+                 model_core,
+                 frame_nb=16, 
+                 class_nb=1000, 
+                 conv_class=False):
+
+        super(Multi_output_model, self).__init__()
+
+        self.resnet_model = model_core
+        
+        self.head_0 = nn.Sequential(
+        self._make_layer(block, 256, layers[2], stride=1),
+        self._make_layer(block, 512, layers[3], stride=2),
+        nn.AvgPool2d(7, stride=1),
+        nn.Linear(512 * block.expansion, num_classes) )
+
+        self.head_1 = nn.Sequential(
+        self._make_layer(block, 256, layers[2], stride=2),
+        self._make_layer(block, 512, layers[3], stride=2),
+        nn.AvgPool2d(7, stride=1),
+        nn.Linear(512 * block.expansion, num_classes) )
+
+        for m in self.head_0.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal(m.weight, mode='fan_out')
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant(m.weight, 1)
+                nn.init.constant(m.bias, 0)
+
+        for m in self.head_1.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal(m.weight, mode='fan_out')
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant(m.weight, 1)
+                nn.init.constant(m.bias, 0)
+
+    def _make_layer(self, block, planes, blocks, stride=1):
+        downsample = None
+        if stride != 1 or self.inplanes != planes * block.expansion:
+            downsample = nn.Sequential(
+                nn.Conv2d(self.inplanes, planes * block.expansion,
+                          kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(planes * block.expansion),
+            )
+
+        layers = []
+        layers.append(block(self.inplanes, planes, stride, downsample))
+        self.inplanes = planes * block.expansion
+        for i in range(1, blocks):
+            layers.append(block(self.inplanes, planes))
+
+        return nn.Sequential(*layers)
+
+    def forward(self, x):
+        x = self.resnet_model(x)
+        
+        head_0 = self.head_0(x)
+
+        head_1 = self.head_1(x)
+
+        return head_0, head_1
+
+
 class InflatedResNet(torch.nn.Module):
-    def __init__(self, resnet2d, frame_nb=16, class_nb=1000, conv_class=False):
+    def __init__(self, 
+                 resnet2d, 
+                 frame_nb=4, 
+                 class_nb=1000, 
+                 conv_class=True):
         """
         Args:
             conv_class: Whether to use convolutional layer as classifier to
@@ -21,11 +90,27 @@ class InflatedResNet(torch.nn.Module):
         self.relu = torch.nn.ReLU(inplace=True)
         self.maxpool1 = nn.MaxPool3d(kernel_size=(1, 3, 3), stride=(1, 2, 2), padding=(0, 1, 1))
 
-        
         self.layer1 = inflate_reslayer(resnet2d.layer1)
         self.layer2 = inflate_reslayer(resnet2d.layer2)
         self.layer3 = inflate_reslayer(resnet2d.layer3)
+        #print("Inflate 3")
+        self.layer3_b = inflate_reslayer(resnet2d.layer3_b)
         self.layer4 = inflate_reslayer(resnet2d.layer4)
+
+        if conv_class:
+            self.avgpool = inflate.inflate_pool(resnet2d.avgpool, time_dim=1)
+            self.classifier = torch.nn.Conv3d(
+                in_channels=2048,
+                out_channels=51,
+                kernel_size=(1, 1, 1),
+                bias=True)
+
+        else:
+            final_time_dim = 1
+            self.avgpool = inflate.inflate_pool(
+                resnet2d.avgpool, time_dim=final_time_dim)
+            self.fc = inflate.inflate_linear(resnet2d.fc, 1)
+
 
     def forward(self, x):
         x = self.conv1(x)
@@ -35,58 +120,90 @@ class InflatedResNet(torch.nn.Module):
 
         x = self.layer1(x)
         x = self.layer2(x)
+    
         x = self.layer3(x)
 
-        return x
+        if x.size()[2] == 4:
+            x_1 = x
+
+            x_1 = self.layer3_b(x_1)
+
+            x_1 = self.layer4(x_1)
+
+            if self.conv_class:
+                x_1 = self.avgpool(x_1)
+                x_1 = self.classifier(x_1)
+                x_1 = x_1.squeeze(3)
+                x_1 = x_1.squeeze(3)
+                x_1 = x_1.mean(2)
+            else:
+                x_1 = self.avgpool(x_1)
+                x_reshape = x_1.view(x_1.size(0), -1)
+                x_1 = self.fc(x_reshape)
+
+            return x, x_1
+        
+        else:
+
+            return x
 
 
 def inflate_reslayer(reslayer2d):
     reslayers3d = []
     for layer2d in reslayer2d:
-        layer3d = BasicBlock3d(layer2d)
+        layer3d = Bottleneck3d(layer2d)
         reslayers3d.append(layer3d)
     return torch.nn.Sequential(*reslayers3d)
 
 
-class BasicBlock3d(torch.nn.Module):
-    def __init__(self, BasicBlock2d):
-        super(BasicBlock3d, self).__init__()
+class Bottleneck3d(torch.nn.Module):
+    def __init__(self, bottleneck2d):
+        super(Bottleneck3d, self).__init__()
 
-        spatial_stride = BasicBlock2d.conv2.stride[0]
+        spatial_stride = bottleneck2d.conv2.stride[0]
+        #print("Spatial stride:", spatial_stride)
 
         self.conv1 = inflate.inflate_conv(
-            BasicBlock2d.conv1, time_dim=1, center=True)
+            bottleneck2d.conv1, time_dim=1, center=True)
 
-        self.bn1 = inflate.inflate_batch_norm(BasicBlock2d.bn1)
-
-        self.relu = torch.nn.ReLU(inplace=True)
+        self.bn1 = inflate.inflate_batch_norm(bottleneck2d.bn1)
 
         self.conv2 = inflate.inflate_conv(
-            BasicBlock2d.conv2,
+            bottleneck2d.conv2,
             time_dim=1,
             time_padding=0,
             time_stride=1,
             center=True)
 
-        self.bn2 = inflate.inflate_batch_norm(BasicBlock2d.bn2)
+        self.bn2 = inflate.inflate_batch_norm(bottleneck2d.bn2)
 
-        if BasicBlock2d.downsample is not None:
+        self.conv3 = inflate.inflate_conv(
+            bottleneck2d.conv3, time_dim=1, center=True)
+
+        self.bn3 = inflate.inflate_batch_norm(bottleneck2d.bn3)
+
+        self.relu = torch.nn.ReLU(inplace=True)
+
+        if bottleneck2d.downsample is not None:
             self.downsample = inflate_downsample(
-                BasicBlock2d.downsample, time_stride=1)
+                bottleneck2d.downsample, time_stride=1)
         else:
             self.downsample = None
 
-        self.stride = BasicBlock2d.stride
+        self.stride = bottleneck2d.stride
 
     def forward(self, x):
         residual = x
         out = self.conv1(x)
         out = self.bn1(out)
+        out = self.relu(out)
 
         out = self.conv2(out)
         out = self.bn2(out)
-
         out = self.relu(out)
+
+        out = self.conv3(out)
+        out = self.bn3(out)
 
         if self.downsample is not None:
             residual = self.downsample(x)
