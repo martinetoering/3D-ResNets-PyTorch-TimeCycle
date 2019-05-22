@@ -360,7 +360,7 @@ class HMDB51(data.Dataset):
         Returns:
             tuple: (image, target) where target is class_index of the target class.
         """
-        
+
         if self.is_train:
 
             # print("\n")
@@ -612,29 +612,7 @@ class HMDB51(data.Dataset):
 
             patch_target = patch_target[0:1]
 
-            # print("IMGS_TARGET:", imgs_target.size())
-            # print("PATCH_TARGET:", patch_target.size())
-
-            # exit()
-
             meta = {'folder_path': folder_path, 'startframe': startframe, 'future_idx': future_idx, 'frame_gap': float(frame_gap), 'crop_offset_x': crop_offset_x, 'crop_offset_y': crop_offset_y, 'dataset': 'vlog'}
-
-            # print("IMGS!!!:", imgs.size())
-
-            # self.path_to_id[folder_path]
-
-            # path = self.data[index]['video']
-
-            # frame_indices = self.data[index]['frame_indices']
-
-            # if self.temporal_transform is not None:
-            #     frame_indices = self.temporal_transform(frame_indices)
-
-            # clip = self.loader(path, frame_indices)
-            # if self.spatial_transform is not None:
-            #     self.spatial_transform.randomize_parameters()
-            #     clip = [self.spatial_transform(img) for img in clip]
-            # clip = torch.stack(clip, 0).permute(1, 0, 2, 3)
 
             sample = self.name_to_sample[folder_path]
             sample['frame_indices'] = indices
@@ -693,7 +671,7 @@ class HMDB51(data.Dataset):
 
                 # Flip
 
-                #if toflip:
+                # if toflip:
                 #    img = torch.from_numpy(fliplr(img.numpy())).float()
 
                 mean=[0.485, 0.456, 0.406]

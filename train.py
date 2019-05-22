@@ -25,11 +25,17 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
     losses = AverageMeter()
     accuracies = AverageMeter()
 
-    main_loss = AverageMeter()
-    losses_vc = AverageMeter()
-    losses_combined = AverageMeter()
+    # TimeCycle
+    main_loss = AverageMeter() # The feature similarity
     losses_theta = AverageMeter()
-    losses_theta_skip = AverageMeter()
+    losses_theta_skip = AverageMeter() 
+    losses_overall = AverageMeter() # Combination of the three
+
+    # Classification
+    losses_vc = AverageMeter()
+
+    # Combined
+    losses_combined = AverageMeter()
 
     losses_dict = dict(
         cnt_trackers=None,
@@ -66,6 +72,7 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
         loss_vc = criterion(outputs_vc, targets)
         acc_vc = calculate_accuracy(outputs_vc, targets)
 
+        # TimeCycle
 
         losses = model.loss(*outputs)
         loss_targ_theta, loss_targ_theta_skip, loss_back_inliers = losses
@@ -75,20 +82,27 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
             loss_targ_theta_skip[0] * opt.lamda
 
         main_loss.update(loss_back_inliers[0].data, imgs.size(0))
-
         losses_theta.update(sum(loss_targ_theta).data / len(loss_targ_theta), imgs.size(0))
         losses_theta_skip.update(sum(loss_targ_theta_skip).data / len(loss_targ_theta_skip), imgs.size(0))
 
+        losses_overall.update(loss[0].data, imgs.size(0))
         
+        # Classification
+
         losses_vc.update(loss_vc.data[0], imgs.size(0))
 
-        losses_combined.update(loss_vc.data[0] + loss_back_inliers[0].data, imgs.size(0))
+        # Combine losses
+
+        loss = (100*loss) + loss_vc
+
+        losses_combined.update((loss_back_inliers[0].data*100) + loss_vc.data[0], imgs.size(0))
 
         accuracies.update(acc_vc, imgs.size(0))
        
         optimizer.zero_grad()        
-        # Combine 
-        loss = loss + loss_vc
+        
+        # Combine losses
+
         loss.backward()
 
         torch.nn.utils.clip_grad_norm(model.parameters(), 10.0)
@@ -96,6 +110,7 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
         optimizer.step()
 
         # Measure elapsed time
+        
         batch_time.update(time.time() - end_time)
         end_time = time.time()
 
@@ -107,7 +122,10 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
             'iter': (epoch - 1) * len(data_loader) + (i + 1),
             'loss': (losses_combined.val)[0],
             'loss_vc': losses_vc.val,
-            'loss_main': (main_loss.val)[0],
+            'loss_overall': (losses_overall.val)[0],
+            'loss_sim': (main_loss.val)[0],
+            'theta_loss': (losses_theta.val)[0],
+            'theta_skip_loss': (losses_theta_skip.val)[0],
             'acc': accuracies.val,
             'lr': get_lr(optimizer)
         })
@@ -150,7 +168,10 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
         'epoch': epoch,
         'loss': (losses_combined.avg)[0],
         'loss_vc': losses_vc.avg,
-        'loss_main': (main_loss.avg)[0],
+        'loss_overall': (losses_overall.avg)[0],
+        'loss_sim': (main_loss.avg)[0],
+        'theta_loss': (losses_theta.avg)[0],
+        'theta_skip_loss': (losses_theta_skip.avg)[0],
         'acc': accuracies.avg,
         'lr': get_lr(optimizer)
     })

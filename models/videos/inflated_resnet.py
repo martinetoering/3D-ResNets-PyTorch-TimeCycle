@@ -5,71 +5,6 @@ import torch.nn as nn
 from . import inflate
 
 
-class Multi_output_model(nn.Module):
-
-    def __init__(self, 
-                 model_core,
-                 frame_nb=16, 
-                 class_nb=1000, 
-                 conv_class=False):
-
-        super(Multi_output_model, self).__init__()
-
-        self.resnet_model = model_core
-        
-        self.head_0 = nn.Sequential(
-        self._make_layer(block, 256, layers[2], stride=1),
-        self._make_layer(block, 512, layers[3], stride=2),
-        nn.AvgPool2d(7, stride=1),
-        nn.Linear(512 * block.expansion, num_classes) )
-
-        self.head_1 = nn.Sequential(
-        self._make_layer(block, 256, layers[2], stride=2),
-        self._make_layer(block, 512, layers[3], stride=2),
-        nn.AvgPool2d(7, stride=1),
-        nn.Linear(512 * block.expansion, num_classes) )
-
-        for m in self.head_0.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal(m.weight, mode='fan_out')
-            elif isinstance(m, nn.BatchNorm2d):
-                nn.init.constant(m.weight, 1)
-                nn.init.constant(m.bias, 0)
-
-        for m in self.head_1.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal(m.weight, mode='fan_out')
-            elif isinstance(m, nn.BatchNorm2d):
-                nn.init.constant(m.weight, 1)
-                nn.init.constant(m.bias, 0)
-
-    def _make_layer(self, block, planes, blocks, stride=1):
-        downsample = None
-        if stride != 1 or self.inplanes != planes * block.expansion:
-            downsample = nn.Sequential(
-                nn.Conv2d(self.inplanes, planes * block.expansion,
-                          kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(planes * block.expansion),
-            )
-
-        layers = []
-        layers.append(block(self.inplanes, planes, stride, downsample))
-        self.inplanes = planes * block.expansion
-        for i in range(1, blocks):
-            layers.append(block(self.inplanes, planes))
-
-        return nn.Sequential(*layers)
-
-    def forward(self, x):
-        x = self.resnet_model(x)
-        
-        head_0 = self.head_0(x)
-
-        head_1 = self.head_1(x)
-
-        return head_0, head_1
-
-
 class InflatedResNet(torch.nn.Module):
     def __init__(self, 
                  resnet2d, 
@@ -93,7 +28,7 @@ class InflatedResNet(torch.nn.Module):
         self.layer1 = inflate_reslayer(resnet2d.layer1)
         self.layer2 = inflate_reslayer(resnet2d.layer2)
         self.layer3 = inflate_reslayer(resnet2d.layer3)
-        #print("Inflate 3")
+        
         self.layer3_b = inflate_reslayer(resnet2d.layer3_b)
         self.layer4 = inflate_reslayer(resnet2d.layer4)
 

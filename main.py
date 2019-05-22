@@ -40,7 +40,6 @@ from torch import nn
 from torch.optim import lr_scheduler
 
 from opts import parse_opts
-from model import generate_model
 from mean import get_mean, get_std
 from spatial_transforms import (
     Compose, Normalize, Scale, CenterCrop, CornerCrop, MultiScaleCornerCrop,
@@ -287,10 +286,10 @@ if __name__ == '__main__':
 
         train_logger = Logger(
            os.path.join(opt.result_path, 'train.log'),
-           ['epoch', 'loss', 'loss_vc', 'loss_main', 'acc', 'lr'])
+           ['epoch', 'loss', 'loss_vc', 'loss_overall', 'loss_sim', 'theta_loss', 'theta_skip_loss', 'acc', 'lr'])
         train_batch_logger = Logger(
            os.path.join(opt.result_path, 'train_batch.log'),
-           ['epoch', 'batch', 'iter', 'loss', 'loss_vc', 'loss_main', 'acc', 'lr'])
+           ['epoch', 'batch', 'iter', 'loss', 'loss_overall', 'loss_sim', 'theta_loss', 'theta_skip_loss', 'acc', 'lr'])
 
         if opt.nesterov:
             dampening = 0
@@ -341,8 +340,6 @@ if __name__ == '__main__':
             'validation',
             frame_gap=opt.frame_gap,
             n_samples_for_each_video=opt.n_val_samples,
-            spatial_transform=spatial_transform,
-            temporal_transform=temporal_transform,
             target_transform=target_transform,
             geometric_transform=geometric_transform,
             sample_duration=opt.sample_duration)
@@ -395,6 +392,8 @@ if __name__ == '__main__':
 
     if not opt.no_test:
 
+        print("\n")
+
         print("TESTING")
 
         spatial_transform = Compose([
@@ -415,8 +414,6 @@ if __name__ == '__main__':
             opt.annotation_path,
             subset,
             n_samples_for_each_video=0,
-            spatial_transform=spatial_transform,
-            temporal_transform=temporal_transform,
             target_transform=target_transform,
             sample_duration=opt.sample_duration)
 
@@ -431,10 +428,13 @@ if __name__ == '__main__':
 
     if not opt.no_eval:
 
-        #print("EVALUATING")
+        print("\n")
+
+        print("EVALUATING")
 
         name = opt.result_path + '/' + "results" + '_' + str(opt.n_epochs) + '.txt'
-        #print("File:", name)
+        
+        print("File:", name)
 
         prediction = os.path.join(opt.result_path, "val.json")
         subset = "validation"

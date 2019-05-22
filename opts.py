@@ -35,12 +35,12 @@ def parse_opts():
         help='Annotation file path')
     parser.add_argument(
         '--result_path',
-        default='results_val',
+        default='results_may23',
         type=str,
         help='Result directory path')
     parser.add_argument(
         '--learning_rate',
-        default=2e-3,
+        default=2e-4,
         type=float,
         help=
         'Initial learning rate (divided by 10 while training by lr scheduler)')
@@ -221,7 +221,7 @@ def parse_opts():
         help='Batch Size')
     parser.add_argument(
         '--n_epochs',
-        default=400,
+        default=100,
         type=int,
         help='Number of total epochs to run')
     parser.add_argument(
