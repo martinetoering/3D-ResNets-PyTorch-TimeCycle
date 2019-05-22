@@ -95,7 +95,7 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
 
         loss = (100*loss) + loss_vc
 
-        losses_combined.update((loss_back_inliers[0].data*100) + loss_vc.data[0], imgs.size(0))
+        losses_combined.update(loss[0].data, imgs.size(0))
 
         accuracies.update(acc_vc, imgs.size(0))
        
@@ -134,12 +134,14 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
         print('Epoch: [{0}][{1}/{2}]\t'
               'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
               'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
+              'Loss {losses_combined.val[0]:.3f} ({losses_combined.avg[0]:.3f})\t'
               'Acc {acc.val:.3f} ({acc.avg:.3f})\t'.format(
                   epoch,
                   i + 1,
                   len(data_loader),
                   batch_time=batch_time,
                   data_time=data_time,
+                  losses_combined=losses_combined,
                   acc=accuracies))
 
         # print("Epoch:", epoch, "[", i+1, "/", len(data_loader), "]")

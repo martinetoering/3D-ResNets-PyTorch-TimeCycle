@@ -289,7 +289,7 @@ if __name__ == '__main__':
            ['epoch', 'loss', 'loss_vc', 'loss_overall', 'loss_sim', 'theta_loss', 'theta_skip_loss', 'acc', 'lr'])
         train_batch_logger = Logger(
            os.path.join(opt.result_path, 'train_batch.log'),
-           ['epoch', 'batch', 'iter', 'loss', 'loss_overall', 'loss_sim', 'theta_loss', 'theta_skip_loss', 'acc', 'lr'])
+           ['epoch', 'batch', 'iter', 'loss', 'loss_vc', 'loss_overall', 'loss_sim', 'theta_loss', 'theta_skip_loss', 'acc', 'lr'])
 
         if opt.nesterov:
             dampening = 0
