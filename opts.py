@@ -35,7 +35,7 @@ def parse_opts():
         help='Annotation file path')
     parser.add_argument(
         '--result_path',
-        default='results_may23',
+        default='resnet_50_timecycle_may23',
         type=str,
         help='Result directory path')
     parser.add_argument(
@@ -216,7 +216,7 @@ def parse_opts():
     )
     parser.add_argument(
         '--batch_size', 
-        default=4, 
+        default=10, 
         type=int, 
         help='Batch Size')
     parser.add_argument(
