@@ -11,9 +11,10 @@ from joblib import delayed
 from joblib import Parallel
 import pandas as pd
 
-file_src = 'meta/manifest.txt'
-folder_path = 'meta/vlog/'
-output_path = 'meta/vlog_256/'
+file_src = '/home/mtoering/data/hmdb_all.txt'
+file_output = '/home/mtoering/data/hmdb_new.txt'
+folder_path = '/home/mtoering/data/hmdb_videos/jpg'
+output_path = '/home/mtoering/data/hmdb_videos/jpg_256'
 
 
 file_list = []
@@ -24,6 +25,17 @@ for line in f:
     rows = line.split()
     fname = rows[0]
     file_list.append(fname)
+
+f.close()
+
+output_list = []
+
+f = open(file_output, 'r')
+
+for line in f:
+    rows = line.split()
+    fname = rows[0]
+    output_list.append(fname)
 
 f.close()
 
@@ -49,9 +61,12 @@ def download_clip_wrapper(row):
     """Wrapper for parallel processing purposes."""
 
     videoname = row
+    videoname2 = row2
+    
+    for filename in os.listdir(videoname):
 
-    inname = folder_path  + '/' + videoname + '/clip.mp4'
-    outname = output_path + '/' +videoname
+        inname = filename
+        outname = filename
 
     if os.path.isdir(outname) is False:
         try:
@@ -66,4 +81,4 @@ def download_clip_wrapper(row):
     return downloaded
 
 
-status_lst = Parallel(n_jobs=15)(delayed(download_clip_wrapper)(row) for row in file_list)
+status_lst = Parallel(n_jobs=15)(delayed(download_clip_wrapper)(row) for row, row2 in zip(file_list, output_list)

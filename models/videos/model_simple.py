@@ -205,8 +205,21 @@ class CycleTime(nn.Module):
 
         x = x.transpose(1, 2)
 
-        if x.size()[2] == 4:
+        if x.size()[2] == 32:
             x_pre, x_class = self.module(x)
+
+            startframe = random.randint(0, (32-25))
+
+            new_x_pre = torch.Tensor(self.videoLen, 3, self.cropSize, self.cropSize)
+            for i in range(4):
+                nowid = int(startframe + i * frame_gap)
+                new_x_pre[i] = x_pre[nowid].clone()
+
+            print("NEW X PRE:", new_x_pre.size())
+
+            exit()
+
+
         else:
             x_pre = self.module(x)
 
@@ -242,7 +255,7 @@ class CycleTime(nn.Module):
 
         return corrfeat, corrfeat_mat, corrfeat_trans, trans_theta
 
-    def forward(self, ximg1, patch2, img2, theta):
+    def forward(self, video, ximg1, patch2, img2, theta):
             
         # print("\n")
         # print("FORWARD")
@@ -251,7 +264,7 @@ class CycleTime(nn.Module):
         B, T = ximg1.shape[:2]
 
         
-        videoclip1  = ximg1
+        videoclip1  = video
 
         # Base features
         

@@ -23,48 +23,6 @@ import numpy as np
 from dataset_utils import load_value_file
 
 
-
-# def pil_loader(path):
-#     # open path as file to avoid ResourceWarning (https://github.com/python-pillow/Pillow/issues/835)
-#     with open(path, 'rb') as f:
-#         with Image.open(f) as img:
-#             return img.convert('RGB')
-
-
-# def accimage_loader(path):
-#     try:
-#         import accimage
-#         return accimage.Image(path)
-#     except IOError:
-#         # Potentially a decoding problem, fall back to PIL.Image
-#         return pil_loader(path)
-
-
-# def get_default_image_loader():
-#     from torchvision import get_image_backend
-#     if get_image_backend() == 'accimage':
-#         return accimage_loader
-#     else:
-#         return pil_loader
-
-
-# def video_loader(video_dir_path, frame_indices, image_loader):
-#     video = []
-#     for i in frame_indices:
-#         image_path = os.path.join(video_dir_path, 'image_{:05d}.jpg'.format(i))
-#         if os.path.exists(image_path):
-#             video.append(image_loader(image_path))
-#         else:
-#             return video
-
-#     return video
-
-
-# def get_default_video_loader():
-#     image_loader = get_default_image_loader()
-#     return functools.partial(video_loader, image_loader=image_loader)
-
-
 def load_annotation_data(data_file_path):
     with open(data_file_path, 'r') as data_file:
         return json.load(data_file)
@@ -118,6 +76,7 @@ def make_dataset(root_path, annotation_path, subset, n_samples_for_each_video,
     #print("Idx_to_class", (idx_to_class))
 
     dataset = []
+    gap_dataset = []
     path_to_id = {}
     name_to_sample = {}
 
@@ -133,9 +92,6 @@ def make_dataset(root_path, annotation_path, subset, n_samples_for_each_video,
         n_frames = int(load_value_file(n_frames_file_path))
         if n_frames <= 0:
             continue
-
-
-
 
 
         frame_gap = frame_gap
@@ -164,11 +120,20 @@ def make_dataset(root_path, annotation_path, subset, n_samples_for_each_video,
 
         name_to_sample[video_path] = sample
 
+        gap_sample = copy.deepcopy(sample)
+
+
 
         if n_samples_for_each_video == 1:
-            sample['frame_indices'] = list(range(1, n_frames + 1, frame_gap))
+            sample['frame_indices'] = list(range(1, n_frames + 1))
+            
+            gap_sample['frame_indices'] = list(range(1, n_frames + 1, frame_gap))
             
             dataset.append(sample)
+
+            gap_dataset.append(gap_sample)
+
+
             # print(sample)
         
             # exit() 
@@ -179,6 +144,9 @@ def make_dataset(root_path, annotation_path, subset, n_samples_for_each_video,
                 # print("n_frames:", n_frames)
                 # print("Sample duration:", sample_duration)
                 step = max(1,
+                           math.ceil((n_frames - 1 - sample_duration) /
+                                     (n_samples_for_each_video - 1)))
+                gap_step = max(1,
                            math.ceil((n_frames - 1 - sample_duration*frame_gap) /
                                      (n_samples_for_each_video - 1)))
                 #print("step:", step)
@@ -189,17 +157,23 @@ def make_dataset(root_path, annotation_path, subset, n_samples_for_each_video,
 
             for j in range(1, n_frames, step):
                 sample_j = copy.deepcopy(sample)
+                gap_sample_j = copy.deepcopy(sample)
                 sample_j['frame_indices'] = list(
+                    range(j, min(n_frames + 1, j + sample_duration)))
+
+                gap_sample_j['frame_indices'] = list(
                     range(j, min(n_frames + 1, j + sample_duration*frame_gap), frame_gap))
 
 
                 dataset.append(sample_j)
 
+                gap_dataset.append(gap_sample_j)
+
                 #print(sample_j)
 
             #exit() 
 
-    return name_to_sample, dataset, idx_to_class, path_to_id
+    return name_to_sample, dataset, gap_dataset, idx_to_class, path_to_id
 
 def cropimg(img, offset_x, offset_y, cropsize):
 
@@ -329,8 +303,9 @@ class HMDB51(data.Dataset):
         print("Sample duration:", sample_duration)        
 
         
+        self.sample_duration = sample_duration
 
-        self.name_to_sample, self.data, self.class_names, self.path_to_id = make_dataset(
+        self.name_to_sample, self.data, self.gap_data, self.class_names, self.path_to_id = make_dataset(
             root_path, annotation_path, subset, n_samples_for_each_video, frame_gap,
             sample_duration, self.predDistance)
 
@@ -363,6 +338,15 @@ class HMDB51(data.Dataset):
 
         if self.is_train:
 
+            path = self.data[index]['video']
+
+            frame_indices = self.data[index]['frame_indices']
+
+            if self.temporal_transform is not None:
+                frame_indices = self.temporal_transform(frame_indices)
+
+            # print("FRAME INDICES for train:", frame_indices)
+
             # print("\n")
             # print("IS TRAIN")
             # print("\n")
@@ -370,6 +354,8 @@ class HMDB51(data.Dataset):
 
             folder_path = self.jpgfiles[index]
             fnum = self.fnums[index]
+
+            video = torch.Tensor(self.sample_duration, 3, self.cropSize, self.cropSize)
 
             imgs = torch.Tensor(self.videoLen, 3, self.cropSize, self.cropSize)
 
@@ -388,20 +374,43 @@ class HMDB51(data.Dataset):
             frame_gap = self.frame_gap
             current_len = (self.videoLen  + self.predDistance) * frame_gap
 
-            startframe = 0
-            future_idx = current_len
+            # print("Current len", current_len)
 
-            if fnum >= current_len:
-                diffnum = fnum - current_len
-                startframe = random.randint(0, diffnum)
-                future_idx = startframe + current_len - 1
+            # startframe = 0
+            # future_idx = current_len
 
-            else:
-                newLen = int(fnum * 2.0 / 3.0)
-                diffnum = fnum - newLen
-                startframe = random.randint(0, diffnum)
-                frame_gap = float(newLen - 1) / float(current_len)
-                future_idx = int(startframe + current_len * frame_gap)
+            # ____TEST____
+
+            # print("TOT HIER")
+
+
+            diffnum = int(self.sample_duration) - 25
+
+            # print("DIFFNUM:", diffnum)
+
+            startframe = random.randint(0, diffnum) + frame_indices[0]
+
+            future_idx = startframe + 20
+
+            # print("Startframe:", startframe, "Frame indices:", frame_indices, "future id", future_idx)
+
+
+            # print("DIFFNUM:", diffnum)
+            # print("STARTFRAME:", startframe)
+            
+
+            # if fnum >= current_len:
+            #     diffnum = fnum - current_len
+            #     startframe = random.randint(0, diffnum)
+            #     future_idx = startframe + current_len - 1
+
+            # else:
+            #     newLen = int(fnum * 2.0 / 3.0)
+            #     diffnum = fnum - newLen
+            #     startframe = random.randint(0, diffnum)
+            #     frame_gap = float(newLen - 1) / float(current_len)
+            #     future_idx = int(startframe + current_len * frame_gap)
+
 
             #print("Start frame::", startframe)
             #print("Future id:", future_idx)
@@ -411,7 +420,6 @@ class HMDB51(data.Dataset):
             crop_offset_x = -1
             crop_offset_y = -1
             ratio = random.random() * (4/3 - 3/4) + 3/4
-            
 
             # Reading video
 
@@ -419,23 +427,38 @@ class HMDB51(data.Dataset):
 
             indices = []
 
+            # for i in range(self.videoLen):
+            #     print(i, "IMGS", int(startframe + i * frame_gap))
+
+            # for i in range(2):
+            #     print(i, "IMGS_TARGET:", int(future_idx + 1 + i * frame_gap))
+
             for i in range(self.videoLen):
 
                 nowid = int(startframe + i * frame_gap)
                 # img_path = folder_path + "{:02d}.jpg".format(nowid)
                 # specialized for fouhey format
 
-                #print(i, "NOW ID:", nowid)
-
-                newid = nowid + 1
+                # print(i, "NOW ID:", nowid)
+            
+                # newid = nowid + 1
+                newid = nowid
 
                 indices.append(newid)
 
-                #img_path = folder_path + "{:06d}.jpg".format(newid)
+            future_id = [] 
 
-                newid = str(newid).zfill(5)
+            for i in range(2):
 
-                img_path = os.path.join(folder_path, "image_{}.jpg".format(newid))
+                newid = int(future_idx + i * frame_gap)
+
+                future_id.append(newid)
+                
+
+            for i, nowid in enumerate(frame_indices):
+                
+                newid = str(nowid).zfill(5)
+                img_path = os.path.join(path, "image_{}.jpg".format(newid))
 
                 img = load_image(img_path)  # CxHxW
 
@@ -456,6 +479,11 @@ class HMDB51(data.Dataset):
                     crop_offset_x = random.randint(0, img.size(2) - self.cropSize - 1)
                     crop_offset_y = random.randint(0, img.size(1) - self.cropSize - 1)
 
+                # print("CROPIMG", img.size())
+                # print("CROPOFFSET X", crop_offset_x)
+                # print("CROPFOSSET Y", crop_offset_y)
+                # print("CROPSIZE:", self.cropSize)
+
                 img = cropimg(img, crop_offset_x, crop_offset_y, self.cropSize)
 
                 assert(img.size(1) == self.cropSize)
@@ -463,70 +491,28 @@ class HMDB51(data.Dataset):
 
                 # Flip
 
-                if toflip:
-                    img = torch.from_numpy(fliplr(img.numpy())).float()
+                # if toflip:
+                #    img = torch.from_numpy(fliplr(img.numpy())).float()
 
                 mean=[0.485, 0.456, 0.406]
                 std=[0.229, 0.224, 0.225]
                 img = color_normalize(img, mean, std)
 
-                imgs[i] = img.clone()
 
-       
+                video[i] = img.clone()
 
-            # Reading img
+                for j, i_d in enumerate(indices):
+                    if nowid == i_d:
+                        imgs[j] = img.clone()
 
-            # img_path = folder_path + "{:02d}.jpg".format(future_idx)
-            # specialized for fouhey format
-
-            for i in range(2):
-
-                newid = int(future_idx + 1 + i * frame_gap)
-                if newid > fnum:
-                    newid = fnum
-
-                #img_path = folder_path + "{:06d}.jpg".format(newid)
-                newid = str(newid).zfill(5)
-                img_path = os.path.join(folder_path, "image_{}.jpg".format(newid))
+                for j, i_d in enumerate(future_id):
+                    if nowid == i_d:
+                        future_imgs[j] = img.clone()
+                        imgs_target[j] = future_imgs[j].clone()
 
 
-                img = load_image(img_path)  # CxHxW
-
-                ht, wd = img.size(1), img.size(2)
-                newh, neww = ht, wd
-
-                if ht <= wd:
-                    ratio  = float(wd) / float(ht)
-                    # width, height
-                    img = resize(img, int(self.imgSize * ratio), self.imgSize)
-                    newh = self.imgSize
-                    neww = int(self.imgSize * ratio)
-
-                else:
-                    ratio  = float(ht) / float(wd)
-                    # width, height
-                    img = resize(img, self.imgSize, int(self.imgSize * ratio))
-                    newh = int(self.imgSize * ratio)
-                    neww = self.imgSize
-
-                img = cropimg(img, crop_offset_x, crop_offset_y, self.cropSize)
-                assert(img.size(1) == self.cropSize)
-                assert(img.size(2) == self.cropSize)
-
-                if toflip:
-                    img = torch.from_numpy(fliplr(img.numpy())).float()
-
-                mean=[0.485, 0.456, 0.406]
-                std=[0.229, 0.224, 0.225]
-                img = color_normalize(img, mean, std)
-
-                future_imgs[i] = img
-
-            for i in range(2):
-
-                imgs_target[i] = future_imgs[i].clone()
-
-
+            # print("VIDEO:", video.size(), "Frame indices:", frame_indices, "start frame:", startframe, "future _id ", future_idx, "imgs indices:", indices, "future _ id sss ", future_id)
+         
             flow_cmb = future_imgs[0] - future_imgs[1]
             flow_cmb = im_to_numpy(flow_cmb)
             flow_cmb = flow_cmb.astype(np.float)
@@ -608,7 +594,11 @@ class HMDB51(data.Dataset):
 
             theta = theta.view(2, 3)
 
+            # print("IMgs tartget before:", imgs_target.size())
+
             imgs_target = imgs_target[0:1]
+
+            # print("IMgs tartget after:", imgs_target.size())
 
             patch_target = patch_target[0:1]
 
@@ -621,7 +611,9 @@ class HMDB51(data.Dataset):
             if self.target_transform is not None:
                 target = self.target_transform(target)
 
-            return imgs, imgs_target, patch_target.data, theta, meta, target
+            # print("META:", meta, "Frame indices:", frame_indices)
+
+            return video, imgs, imgs_target, patch_target.data, theta, meta, target
 
         else:
 
@@ -629,18 +621,23 @@ class HMDB51(data.Dataset):
             # if random.random() <= 0.5:
             #     toflip = True
 
-            crop_offset_x = -1
-            crop_offset_y = -1
-            ratio = random.random() * (4/3 - 3/4) + 3/4
+            # crop_offset_x = -1
+            # crop_offset_y = -1
+            # ratio = random.random() * (4/3 - 3/4) + 3/4
 
             path = self.data[index]['video']
 
             frame_indices = self.data[index]['frame_indices']
 
-            imgs = torch.Tensor(self.videoLen, 3, self.cropSize, self.cropSize)
+            print("Frame indices:", frame_indices)
+
+            exit()
+
+            video = torch.Tensor(self.sample_duration, 3, self.cropSize, self.cropSize)
+
+            print("IMGS:", imgs.size())
 
             for i, nowid in enumerate(frame_indices):
-
                 
                 newid = str(nowid).zfill(5)
                 img_path = os.path.join(path, "image_{}.jpg".format(newid))
@@ -660,11 +657,17 @@ class HMDB51(data.Dataset):
                     img = resize(img, self.imgSize, int(self.imgSize * ratio))
 
 
-                if crop_offset_x == -1:
-                    crop_offset_x = random.randint(0, img.size(2) - self.cropSize - 1)
-                    crop_offset_y = random.randint(0, img.size(1) - self.cropSize - 1)
+                # Center crop, following KenshoHara
 
-                img = cropimg(img, crop_offset_x, crop_offset_y, self.cropSize)
+                width, height = img.size(2), img.size(1)
+                print("IMG before:", width, height)
+
+                x1 = int(round((width - 240) / 2.))
+                y1 = int(round((height - 240) / 2.))
+
+                img = cropimg(img, x1, y1, self.cropSize)
+
+                print("IMG after:", img.size())
 
                 assert(img.size(1) == self.cropSize)
                 assert(img.size(2) == self.cropSize)
@@ -678,7 +681,7 @@ class HMDB51(data.Dataset):
                 std=[0.229, 0.224, 0.225]
                 img = color_normalize(img, mean, std)
 
-                imgs[i] = img.clone()
+                video[i] = img.clone()
 
             target = self.data[index]
 
@@ -686,7 +689,7 @@ class HMDB51(data.Dataset):
                 target = self.target_transform(target)
 
 
-            return imgs, target
+            return video, target
 
 
     def __len__(self):

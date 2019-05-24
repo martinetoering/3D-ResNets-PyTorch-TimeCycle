@@ -55,9 +55,11 @@ def test(data_loader, model, opt, class_names):
             if not (i == 0 and j == 0) and targets[j] != previous_video_id:
                 calculate_video_results(output_buffer, previous_video_id,
                                         test_results, class_names)
+
                 output_buffer = []
             output_buffer.append(outputs[j].data.cpu())
             previous_video_id = targets[j]
+        
 
         if (i % 100) == 0:
             with open(
@@ -76,6 +78,9 @@ def test(data_loader, model, opt, class_names):
                   len(data_loader),
                   batch_time=batch_time,
                   data_time=data_time))
+
+    print("Test results:", test_results)
+
     with open(
             os.path.join(opt.result_path, '{}.json'.format(opt.test_subset)),
             'w') as f:

@@ -253,7 +253,7 @@ if __name__ == '__main__':
         #     ToTensor(opt.norm_value), norm_method
         # ])
 
-        # temporal_transform = TemporalRandomCrop(opt.sample_duration)
+        temporal_transform = TemporalRandomCrop(opt.sample_duration)
         target_transform = ClassLabel()
 
         geometric_transform = GeometricTnf(
@@ -269,7 +269,9 @@ if __name__ == '__main__':
             opt.annotation_path,
             'training',
             frame_gap=opt.frame_gap,
+            sample_duration=opt.sample_duration,
             target_transform=target_transform,
+            temporal_transform=temporal_transform,
             geometric_transform=geometric_transform)
 
         print("Training data obtained")

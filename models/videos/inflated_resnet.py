@@ -58,10 +58,10 @@ class InflatedResNet(torch.nn.Module):
     
         x = self.layer3(x)
 
-        if x.size()[2] == 4:
+        if x.size()[2] == 32:
             x_1 = x
 
-            x_1 = self.layer3_b(x_1)
+            x_1 = self.maxpool1(x_1)
 
             x_1 = self.layer4(x_1)
 

@@ -46,7 +46,7 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
 
     end_time = time.time()
     
-    for i, (imgs, img, patch2, theta, meta, targets) in enumerate(data_loader):
+    for i, (video, imgs, img, patch2, theta, meta, targets) in enumerate(data_loader):
         
         # Measure data loading time
         data_time.update(time.time() - end_time)
@@ -54,6 +54,7 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
         if imgs.size(0) < params['batch_size']:
             break
 
+        video = Variable(imgs.cuda())
         imgs = Variable(imgs.cuda())
         img = Variable(img.cuda())
         patch2 = Variable(patch2.cuda())
@@ -67,7 +68,7 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
             targets = targets.cuda(async=True)
         targets = Variable(targets)
 
-        outputs_vc, outputs = model(imgs, patch2, img, theta)
+        outputs_vc, outputs = model(video, imgs, patch2, img, theta)
 
         loss_vc = criterion(outputs_vc, targets)
         acc_vc = calculate_accuracy(outputs_vc, targets)

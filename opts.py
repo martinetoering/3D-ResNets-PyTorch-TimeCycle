@@ -14,7 +14,7 @@ def parse_opts():
 
     parser.add_argument(
         '--root_path',
-        default='/home/martine/data',
+        default='/home/mtoering/data',
         type=str,
         help='Root directory path of data')
     parser.add_argument(
@@ -35,7 +35,7 @@ def parse_opts():
         help='Annotation file path')
     parser.add_argument(
         '--result_path',
-        default='resnet_50_timecycle_may23',
+        default='resnet50_sampleduration32',
         type=str,
         help='Result directory path')
     parser.add_argument(
@@ -56,14 +56,6 @@ def parse_opts():
         type=float,
         metavar='W', 
         help='weight decay (default: 1e-4)')
-    # Checkpoints
-    # parser.add_argument(
-    #     '-pc', 
-    #     '--path_checkpoint', 
-    #     default='resnet50_checkpoint',
-    #     type=str, 
-    #     metavar='PATH',
-    #     help='path to save checkpoint (default: checkpoint)')
     # Miscs
     parser.add_argument(
         '--manualSeed', type=int, help='manual seed')
@@ -75,7 +67,7 @@ def parse_opts():
         help='id(s) for CUDA_VISIBLE_DEVICES')
     parser.add_argument(
         '--predDistance', 
-        default=4, type=int,
+        default=0, type=int,
         help='predict how many frames away')
     parser.add_argument(
         '--seperate2d', 
@@ -111,7 +103,7 @@ def parse_opts():
         help='')
     parser.add_argument(
         '--frame_gap', 
-        default=2, 
+        default=5, 
         type=int,
         help='')
     parser.add_argument(
@@ -131,7 +123,7 @@ def parse_opts():
         help='Height and width of inputs')
     parser.add_argument(
         '--sample_duration',
-        default=4,
+        default=32,
         type=int,
         help='Temporal duration of inputs')
 
