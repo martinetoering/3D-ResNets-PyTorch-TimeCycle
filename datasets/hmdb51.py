@@ -368,27 +368,28 @@ class HMDB51(data.Dataset):
             startframe = 0
             future_idx = current_len
 
-            if fnum >= current_len:
+            if fnum >= len_video:
                 diff = fnum - len_video
                 start = random.randint(0, diff)
                 diffnum = (start + len_video) - current_len
                 startframe = random.randint(start, diffnum)
                 future_idx = startframe + current_len - 1
+
+                frame_indices = frame_indices[start:(start+len_video)]
             else:
                 newLen = int(fnum * 2.0 / 3.0)
                 diff = fnum - newLen
-                start = random.randint(0, diff)
-                newLen2 = int(current_len * 2.0 / 3.0)
-                diffnum = (start + newLen) - newLen2
-                startframe = random.randint(start, diffnum)
-                frame_gap = float(newLen2 - 1) / float(current_len)
+                startframe = random.randint(0, diff)
+                frame_gap = float(newLen - 1) / float(current_len)
                 future_idx = int(startframe + current_len * frame_gap)
+
+                frame_indices = frame_indices[startframe:(startframe+newLen)]
+
 
                 # print("TRUE")
                 # print("Length video:", len_video, "Current len:", current_len, "Fnum", fnum, "Diff video and fnum:", diff, "Start video:", start, "Difference imgs and video:", diffnum, "Startframe imgs:", startframe, "Future id:", future_idx)
 
             #print(frame_indices)
-            frame_indices = frame_indices[start:(start+len_video)]
             #print(frame_indices)
             #if frame_indices == []:
             # print("Length video:", len_video, "Current len:", current_len, "Fnum", fnum, "Diff video and fnum:", diff, "Start video:", start, "Difference imgs and video:", diffnum, "Startframe imgs:", startframe, "Future id:", future_idx)
