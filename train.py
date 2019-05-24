@@ -46,16 +46,16 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
 
     end_time = time.time()
     
-    for i, (video, imgs, img, patch2, theta, meta, targets) in enumerate(data_loader):
+    for i, (video, img, patch2, theta, meta, targets) in enumerate(data_loader):
         
         # Measure data loading time
         data_time.update(time.time() - end_time)
 
-        if imgs.size(0) < params['batch_size']:
+        if video.size(0) < params['batch_size']:
             break
 
-        video = Variable(imgs.cuda())
-        imgs = Variable(imgs.cuda())
+        video = Variable(video.cuda())
+        # imgs = Variable(imgs.cuda())
         img = Variable(img.cuda())
         patch2 = Variable(patch2.cuda())
         theta = Variable(theta.cuda())
@@ -66,9 +66,10 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
 
         if not opt.no_cuda:
             targets = targets.cuda(async=True)
+        
         targets = Variable(targets)
 
-        outputs_vc, outputs = model(video, imgs, patch2, img, theta)
+        outputs_vc, outputs = model(video, patch2, img, theta)
 
         loss_vc = criterion(outputs_vc, targets)
         acc_vc = calculate_accuracy(outputs_vc, targets)
@@ -82,23 +83,23 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
             sum(loss_back_inliers) / len(loss_back_inliers) + \
             loss_targ_theta_skip[0] * opt.lamda
 
-        main_loss.update(loss_back_inliers[0].data, imgs.size(0))
-        losses_theta.update(sum(loss_targ_theta).data / len(loss_targ_theta), imgs.size(0))
-        losses_theta_skip.update(sum(loss_targ_theta_skip).data / len(loss_targ_theta_skip), imgs.size(0))
+        main_loss.update(loss_back_inliers[0].data, video.size(0))
+        losses_theta.update(sum(loss_targ_theta).data / len(loss_targ_theta), video.size(0))
+        losses_theta_skip.update(sum(loss_targ_theta_skip).data / len(loss_targ_theta_skip), video.size(0))
 
-        losses_overall.update(loss[0].data, imgs.size(0))
+        losses_overall.update(loss[0].data, video.size(0))
         
         # Classification
 
-        losses_vc.update(loss_vc.data[0], imgs.size(0))
+        losses_vc.update(loss_vc.data[0], video.size(0))
 
         # Combine losses
 
         loss = (100*loss) + loss_vc
 
-        losses_combined.update(loss[0].data, imgs.size(0))
+        losses_combined.update(loss[0].data, video.size(0))
 
-        accuracies.update(acc_vc, imgs.size(0))
+        accuracies.update(acc_vc, video.size(0))
        
         optimizer.zero_grad()        
         

@@ -9,6 +9,7 @@ class InflatedResNet(torch.nn.Module):
     def __init__(self, 
                  resnet2d, 
                  frame_nb=4, 
+                 sample_duration=25,
                  class_nb=1000, 
                  conv_class=True):
         """
@@ -18,6 +19,7 @@ class InflatedResNet(torch.nn.Module):
         """
         super(InflatedResNet, self).__init__()
         self.conv_class = conv_class
+        self.sample_duration = sample_duration
 
         self.conv1 = inflate.inflate_conv(
             resnet2d.conv1, time_dim=1, time_padding=0, center=True)
@@ -58,7 +60,12 @@ class InflatedResNet(torch.nn.Module):
     
         x = self.layer3(x)
 
-        if x.size()[2] == 32:
+        if x.size()[2] != self.sample_duration:
+
+            return x
+
+        else:
+
             x_1 = x
 
             x_1 = self.maxpool1(x_1)
@@ -77,10 +84,6 @@ class InflatedResNet(torch.nn.Module):
                 x_1 = self.fc(x_reshape)
 
             return x, x_1
-        
-        else:
-
-            return x
 
 
 def inflate_reslayer(reslayer2d):

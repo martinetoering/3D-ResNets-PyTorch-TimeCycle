@@ -29,6 +29,7 @@ class CycleTime(nn.Module):
                  class_num=8, 
                  dim_in=2048, 
                  trans_param_num=3, 
+                 sample_duration=25,
                  detach_network=False, 
                  pretrained=False, 
                  temporal_out=4, 
@@ -42,13 +43,16 @@ class CycleTime(nn.Module):
         print("\n")
 
         dim = 512
+        self.sample_duration = sample_duration 
+
         print("Pretrained Imagenet:", pretrained)
 
         resnet = resnet_res4s1.resnet50(pretrained=pretrained)
         #resnet = resnet_res4s1.multi_output_model(resnet, pretrained=pretrained)
-        self.module = inflated_resnet.InflatedResNet(copy.deepcopy(resnet))
+        self.module = inflated_resnet.InflatedResNet(copy.deepcopy(resnet), sample_duration)
 
         #print(self.module)
+
 
         self.detach_network = detach_network
         self.hist = hist
@@ -205,20 +209,13 @@ class CycleTime(nn.Module):
 
         x = x.transpose(1, 2)
 
-        if x.size()[2] == 32:
+        if x.size()[2] == self.sample_duration:
             x_pre, x_class = self.module(x)
 
-            startframe = random.randint(0, (32-25))
+            startframe = 0
+            futureid = startframe + 20
 
-            new_x_pre = torch.Tensor(self.videoLen, 3, self.cropSize, self.cropSize)
-            for i in range(4):
-                nowid = int(startframe + i * frame_gap)
-                new_x_pre[i] = x_pre[nowid].clone()
-
-            print("NEW X PRE:", new_x_pre.size())
-
-            exit()
-
+            x_pre = x_pre[:, :, startframe:futureid:5, :, :]
 
         else:
             x_pre = self.module(x)
@@ -255,13 +252,16 @@ class CycleTime(nn.Module):
 
         return corrfeat, corrfeat_mat, corrfeat_trans, trans_theta
 
-    def forward(self, video, ximg1, patch2, img2, theta):
+    def forward(self, video, patch2, img2, theta):
             
         # print("\n")
         # print("FORWARD")
         # print("\n")
 
-        B, T = ximg1.shape[:2]
+        B, T = video.shape[:2]
+        T = 4
+        # print("B: ", B, "T: ", T)
+
 
         
         videoclip1  = video
@@ -386,6 +386,8 @@ class CycleTime(nn.Module):
                 TT = T
 
             # propagate backward
+
+            
             # back_trans_thetas, back_trans_feats, back_corr_feat_mats = \
             back_trans_thetas, back_trans_feats = \
                 recurrent_align(patch_feat2_norm, list(range(T))[::-1][:TT])

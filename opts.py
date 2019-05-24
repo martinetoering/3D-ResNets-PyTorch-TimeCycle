@@ -14,7 +14,7 @@ def parse_opts():
 
     parser.add_argument(
         '--root_path',
-        default='/home/mtoering/data',
+        default='/home/martine/data',
         type=str,
         help='Root directory path of data')
     parser.add_argument(
@@ -35,7 +35,7 @@ def parse_opts():
         help='Annotation file path')
     parser.add_argument(
         '--result_path',
-        default='resnet50_sampleduration32',
+        default='resnet50_sampleduration25_w100_bs2',
         type=str,
         help='Result directory path')
     parser.add_argument(
@@ -123,7 +123,7 @@ def parse_opts():
         help='Height and width of inputs')
     parser.add_argument(
         '--sample_duration',
-        default=32,
+        default=25,
         type=int,
         help='Temporal duration of inputs')
 
@@ -208,7 +208,7 @@ def parse_opts():
     )
     parser.add_argument(
         '--batch_size', 
-        default=10, 
+        default=2, 
         type=int, 
         help='Batch Size')
     parser.add_argument(

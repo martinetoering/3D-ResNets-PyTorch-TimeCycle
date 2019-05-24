@@ -232,7 +232,7 @@ class HMDB51(data.Dataset):
                  temporal_transform=None,
                  target_transform=None,
                  geometric_transform=None,
-                 sample_duration=16):
+                 sample_duration=25):
 
         self.filelist = params['filelist']
         self.batch_size = params['batch_size']
@@ -342,28 +342,19 @@ class HMDB51(data.Dataset):
 
             frame_indices = self.data[index]['frame_indices']
 
-            if self.temporal_transform is not None:
-                frame_indices = self.temporal_transform(frame_indices)
-
             # print("FRAME INDICES for train:", frame_indices)
-
-            # print("\n")
-            # print("IS TRAIN")
-            # print("\n")
-
 
             folder_path = self.jpgfiles[index]
             fnum = self.fnums[index]
 
             video = torch.Tensor(self.sample_duration, 3, self.cropSize, self.cropSize)
 
-            imgs = torch.Tensor(self.videoLen, 3, self.cropSize, self.cropSize)
+            # imgs = torch.Tensor(self.videoLen, 3, self.cropSize, self.cropSize)
 
             imgs_target  = torch.Tensor(2, 3, self.cropSize, self.cropSize)
             patch_target = torch.Tensor(2, 3, self.cropSize, self.cropSize)
 
             future_imgs  = torch.Tensor(2, 3, self.cropSize, self.cropSize)
-
 
             # Random flip
 
@@ -373,27 +364,47 @@ class HMDB51(data.Dataset):
 
             frame_gap = self.frame_gap
             current_len = (self.videoLen  + self.predDistance) * frame_gap
+            len_video = self.sample_duration
+            startframe = 0
+            future_idx = current_len
 
+            if fnum >= current_len:
+                diff = fnum - len_video
+                start = random.randint(0, diff)
+                diffnum = (start + len_video) - current_len
+                startframe = random.randint(start, diffnum)
+                future_idx = startframe + current_len - 1
+            else:
+                newLen = int(fnum * 2.0 / 3.0)
+                diff = fnum - newLen
+                start = random.randint(0, diff)
+                newLen2 = int(current_len * 2.0 / 3.0)
+                diffnum = (start + newLen) - newLen2
+                startframe = random.randint(start, diffnum)
+                frame_gap = float(newLen2 - 1) / float(current_len)
+                future_idx = int(startframe + current_len * frame_gap)
+
+                # print("TRUE")
+                # print("Length video:", len_video, "Current len:", current_len, "Fnum", fnum, "Diff video and fnum:", diff, "Start video:", start, "Difference imgs and video:", diffnum, "Startframe imgs:", startframe, "Future id:", future_idx)
+
+            #print(frame_indices)
+            frame_indices = frame_indices[start:(start+len_video)]
+            #print(frame_indices)
+            #if frame_indices == []:
+            # print("Length video:", len_video, "Current len:", current_len, "Fnum", fnum, "Diff video and fnum:", diff, "Start video:", start, "Difference imgs and video:", diffnum, "Startframe imgs:", startframe, "Future id:", future_idx)
+
+            #print("Frame indices:", frame_indices)
             # print("Current len", current_len)
 
-            # startframe = 0
-            # future_idx = current_len
+            # diffnum = int(self.sample_duration) - 25
 
-            # ____TEST____
+            # # print("DIFFNUM:", diffnum)
 
-            # print("TOT HIER")
+            # startframe = random.randint(0, diffnum) + frame_indices[0]
 
-
-            diffnum = int(self.sample_duration) - 25
-
-            # print("DIFFNUM:", diffnum)
-
-            startframe = random.randint(0, diffnum) + frame_indices[0]
-
-            future_idx = startframe + 20
+            # future_idx = startframe + 20
 
             # print("Startframe:", startframe, "Frame indices:", frame_indices, "future id", future_idx)
-
 
             # print("DIFFNUM:", diffnum)
             # print("STARTFRAME:", startframe)
@@ -442,6 +453,7 @@ class HMDB51(data.Dataset):
                 # print(i, "NOW ID:", nowid)
             
                 # newid = nowid + 1
+
                 newid = nowid
 
                 indices.append(newid)
@@ -457,6 +469,8 @@ class HMDB51(data.Dataset):
 
             for i, nowid in enumerate(frame_indices):
                 
+                # nowid = int(startframe + i * frame_gap)
+
                 newid = str(nowid).zfill(5)
                 img_path = os.path.join(path, "image_{}.jpg".format(newid))
 
@@ -501,14 +515,16 @@ class HMDB51(data.Dataset):
 
                 video[i] = img.clone()
 
-                for j, i_d in enumerate(indices):
-                    if nowid == i_d:
-                        imgs[j] = img.clone()
+                # for j, i_d in enumerate(indices):
+                #     if nowid == i_d:
+                #         imgs[j] = img.clone()
 
                 for j, i_d in enumerate(future_id):
                     if nowid == i_d:
                         future_imgs[j] = img.clone()
                         imgs_target[j] = future_imgs[j].clone()
+
+            # print("FUtUrE IMGS:", future_imgs.size(), "VIDEO:", video.size())
 
 
             # print("VIDEO:", video.size(), "Frame indices:", frame_indices, "start frame:", startframe, "future _id ", future_idx, "imgs indices:", indices, "future _ id sss ", future_id)
@@ -613,7 +629,7 @@ class HMDB51(data.Dataset):
 
             # print("META:", meta, "Frame indices:", frame_indices)
 
-            return video, imgs, imgs_target, patch_target.data, theta, meta, target
+            return video, imgs_target, patch_target.data, theta, meta, target
 
         else:
 
@@ -629,13 +645,11 @@ class HMDB51(data.Dataset):
 
             frame_indices = self.data[index]['frame_indices']
 
-            print("Frame indices:", frame_indices)
-
-            exit()
+            # print("Frame indices:", frame_indices)
 
             video = torch.Tensor(self.sample_duration, 3, self.cropSize, self.cropSize)
 
-            print("IMGS:", imgs.size())
+            # print("IMGS:", imgs.size())
 
             for i, nowid in enumerate(frame_indices):
                 
@@ -655,7 +669,6 @@ class HMDB51(data.Dataset):
                     ratio  = float(ht) / float(wd)
                     # width, height
                     img = resize(img, self.imgSize, int(self.imgSize * ratio))
-
 
                 # Center crop, following KenshoHara
 
@@ -687,7 +700,6 @@ class HMDB51(data.Dataset):
 
             if self.target_transform is not None:
                 target = self.target_transform(target)
-
 
             return video, target
 
