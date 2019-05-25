@@ -338,10 +338,6 @@ class HMDB51(data.Dataset):
 
         if self.is_train:
 
-            path = self.data[index]['video']
-
-            frame_indices = self.data[index]['frame_indices']
-
             # print("FRAME INDICES for train:", frame_indices)
 
             folder_path = self.jpgfiles[index]
@@ -364,102 +360,34 @@ class HMDB51(data.Dataset):
 
             frame_gap = self.frame_gap
             current_len = (self.videoLen  + self.predDistance) * frame_gap
-            len_video = self.sample_duration
+            sample_duration = self.sample_duration
             startframe = 0
-            future_idx = current_len
+            future_idx = sample_duration
 
-            if fnum >= len_video:
-                diff = fnum - len_video
-                start = random.randint(0, diff)
-                diffnum = (start + len_video) - current_len
-                startframe = random.randint(start, diffnum)
-                future_idx = startframe + current_len - 1
+            if fnum >= sample_duration:
+                diff = fnum - sample_duration
+                startframe = random.randint(0, diff)
+                future_idx = startframe + sample_duration - 1
 
-                frame_indices = frame_indices[start:(start+len_video)]
+                # print("start frame: ", startframe)
+                # print("future id:", future_idx)
+                
+
             else:
                 newLen = int(fnum * 2.0 / 3.0)
-                diff = fnum - newLen
-                startframe = random.randint(0, diff)
-                frame_gap = float(newLen - 1) / float(current_len)
-                future_idx = int(startframe + current_len * frame_gap)
+                diffnum = fnum - newLen
+                startframe = random.randint(0, diffnum)
+                frame_gap = float(newLen - 1) / float(sample_duration)
+                future_idx = int(startframe + sample_duration * frame_gap)
 
-                frame_indices = frame_indices[startframe:(startframe+newLen)]
-
-
-                # print("TRUE")
-                # print("Length video:", len_video, "Current len:", current_len, "Fnum", fnum, "Diff video and fnum:", diff, "Start video:", start, "Difference imgs and video:", diffnum, "Startframe imgs:", startframe, "Future id:", future_idx)
-
-            #print(frame_indices)
-            #print(frame_indices)
-            #if frame_indices == []:
-            # print("Length video:", len_video, "Current len:", current_len, "Fnum", fnum, "Diff video and fnum:", diff, "Start video:", start, "Difference imgs and video:", diffnum, "Startframe imgs:", startframe, "Future id:", future_idx)
-
-            #print("Frame indices:", frame_indices)
-            # print("Current len", current_len)
-
-            # diffnum = int(self.sample_duration) - 25
-
-            # # print("DIFFNUM:", diffnum)
-
-            # startframe = random.randint(0, diffnum) + frame_indices[0]
-
-            # future_idx = startframe + 20
-
-            # print("Startframe:", startframe, "Frame indices:", frame_indices, "future id", future_idx)
-
-            # print("DIFFNUM:", diffnum)
-            # print("STARTFRAME:", startframe)
-            
-
-            # if fnum >= current_len:
-            #     diffnum = fnum - current_len
-            #     startframe = random.randint(0, diffnum)
-            #     future_idx = startframe + current_len - 1
-
-            # else:
-            #     newLen = int(fnum * 2.0 / 3.0)
-            #     diffnum = fnum - newLen
-            #     startframe = random.randint(0, diffnum)
-            #     frame_gap = float(newLen - 1) / float(current_len)
-            #     future_idx = int(startframe + current_len * frame_gap)
-
-
-            #print("Start frame::", startframe)
-            #print("Future id:", future_idx)
-
-            #exit()
+                print("start frame", startframe)
+                print("FUTURE ID:", future_idx)
 
             crop_offset_x = -1
             crop_offset_y = -1
             ratio = random.random() * (4/3 - 3/4) + 3/4
 
-            # Reading video
-
-            # print("READING VIDEO:")
-
-            indices = []
-
-            # for i in range(self.videoLen):
-            #     print(i, "IMGS", int(startframe + i * frame_gap))
-
-            # for i in range(2):
-            #     print(i, "IMGS_TARGET:", int(future_idx + 1 + i * frame_gap))
-
-            for i in range(self.videoLen):
-
-                nowid = int(startframe + i * frame_gap)
-                # img_path = folder_path + "{:02d}.jpg".format(nowid)
-                # specialized for fouhey format
-
-                # print(i, "NOW ID:", nowid)
-            
-                # newid = nowid + 1
-
-                newid = nowid
-
-                indices.append(newid)
-
-            future_id = [] 
+            future_id = []
 
             for i in range(2):
 
@@ -468,12 +396,16 @@ class HMDB51(data.Dataset):
                 future_id.append(newid)
                 
 
-            for i, nowid in enumerate(frame_indices):
-                
-                # nowid = int(startframe + i * frame_gap)
+            frame_indices = list(range(startframe, (future_idx+1)))
+            
+            #print("start frame: ", startframe, "future id:", future_idx, "Future id incides", future_id, "frame indices", frame_indices, len(frame_indices))
 
-                newid = str(nowid).zfill(5)
-                img_path = os.path.join(path, "image_{}.jpg".format(newid))
+            for i in range(sample_duration):
+                
+                nowid = int(startframe + i)
+                newid = nowid + 1
+                newid = str(newid).zfill(5)
+                img_path = os.path.join(folder_path, "image_{}.jpg".format(newid))
 
                 img = load_image(img_path)  # CxHxW
 
@@ -494,10 +426,6 @@ class HMDB51(data.Dataset):
                     crop_offset_x = random.randint(0, img.size(2) - self.cropSize - 1)
                     crop_offset_y = random.randint(0, img.size(1) - self.cropSize - 1)
 
-                # print("CROPIMG", img.size())
-                # print("CROPOFFSET X", crop_offset_x)
-                # print("CROPFOSSET Y", crop_offset_y)
-                # print("CROPSIZE:", self.cropSize)
 
                 img = cropimg(img, crop_offset_x, crop_offset_y, self.cropSize)
 
@@ -506,8 +434,8 @@ class HMDB51(data.Dataset):
 
                 # Flip
 
-                # if toflip:
-                #    img = torch.from_numpy(fliplr(img.numpy())).float()
+                if toflip:
+                   img = torch.from_numpy(fliplr(img.numpy())).float()
 
                 mean=[0.485, 0.456, 0.406]
                 std=[0.229, 0.224, 0.225]
@@ -515,10 +443,6 @@ class HMDB51(data.Dataset):
 
 
                 video[i] = img.clone()
-
-                # for j, i_d in enumerate(indices):
-                #     if nowid == i_d:
-                #         imgs[j] = img.clone()
 
                 for j, i_d in enumerate(future_id):
                     if nowid == i_d:
@@ -528,8 +452,9 @@ class HMDB51(data.Dataset):
             # print("FUtUrE IMGS:", future_imgs.size(), "VIDEO:", video.size())
 
 
-            # print("VIDEO:", video.size(), "Frame indices:", frame_indices, "start frame:", startframe, "future _id ", future_idx, "imgs indices:", indices, "future _ id sss ", future_id)
+            # print("VIDEO:", video.size(), "Frame indices:", frame_indices, "start frame:", startframe, "future _id ", future_idx, "future _ id sss ", future_id)
          
+
             flow_cmb = future_imgs[0] - future_imgs[1]
             flow_cmb = im_to_numpy(flow_cmb)
             flow_cmb = flow_cmb.astype(np.float)
@@ -622,7 +547,7 @@ class HMDB51(data.Dataset):
             meta = {'folder_path': folder_path, 'startframe': startframe, 'future_idx': future_idx, 'frame_gap': float(frame_gap), 'crop_offset_x': crop_offset_x, 'crop_offset_y': crop_offset_y, 'dataset': 'vlog'}
 
             sample = self.name_to_sample[folder_path]
-            sample['frame_indices'] = indices
+            # sample['frame_indices'] = indices
             target = sample
 
             if self.target_transform is not None:
@@ -674,14 +599,14 @@ class HMDB51(data.Dataset):
                 # Center crop, following KenshoHara
 
                 width, height = img.size(2), img.size(1)
-                print("IMG before:", width, height)
+                # print("IMG before:", width, height)
 
                 x1 = int(round((width - 240) / 2.))
                 y1 = int(round((height - 240) / 2.))
 
                 img = cropimg(img, x1, y1, self.cropSize)
 
-                print("IMG after:", img.size())
+                # print("IMG after:", img.size())
 
                 assert(img.size(1) == self.cropSize)
                 assert(img.size(2) == self.cropSize)

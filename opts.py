@@ -35,7 +35,7 @@ def parse_opts():
         help='Annotation file path')
     parser.add_argument(
         '--result_path',
-        default='resnet50_sampleduration25_w100_bs2',
+        default='resnet50_sampleduration13_w100_bs4',
         type=str,
         help='Result directory path')
     parser.add_argument(
@@ -98,12 +98,12 @@ def parse_opts():
         help='pretrained_imagenet')
     parser.add_argument(
         '--videoLen', 
-        default=4, 
+        default=3, 
         type=int,
         help='')
     parser.add_argument(
         '--frame_gap', 
-        default=5, 
+        default=4, 
         type=int,
         help='')
     parser.add_argument(
@@ -123,7 +123,7 @@ def parse_opts():
         help='Height and width of inputs')
     parser.add_argument(
         '--sample_duration',
-        default=25,
+        default=13,
         type=int,
         help='Temporal duration of inputs')
 
@@ -208,7 +208,7 @@ def parse_opts():
     )
     parser.add_argument(
         '--batch_size', 
-        default=2, 
+        default=4, 
         type=int, 
         help='Batch Size')
     parser.add_argument(

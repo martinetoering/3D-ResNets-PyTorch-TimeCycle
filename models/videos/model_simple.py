@@ -28,8 +28,9 @@ class CycleTime(nn.Module):
     def __init__(self, 
                  class_num=8, 
                  dim_in=2048, 
+                 frame_gap=4,
                  trans_param_num=3, 
-                 sample_duration=25,
+                 sample_duration=13,
                  detach_network=False, 
                  pretrained=False, 
                  temporal_out=4, 
@@ -43,6 +44,7 @@ class CycleTime(nn.Module):
         print("\n")
 
         dim = 512
+        self.frame_gap = frame_gap
         self.sample_duration = sample_duration 
 
         print("Pretrained Imagenet:", pretrained)
@@ -210,12 +212,14 @@ class CycleTime(nn.Module):
         x = x.transpose(1, 2)
 
         if x.size()[2] == self.sample_duration:
+            
             x_pre, x_class = self.module(x)
 
             startframe = 0
-            futureid = startframe + 20
+            futureid = startframe + self.sample_duration - 1
 
-            x_pre = x_pre[:, :, startframe:futureid:5, :, :]
+            x_pre = x_pre[:, :, startframe:futureid:self.frame_gap, :, :]
+            # print("XPRE SIZE:", x_pre.size())
 
         else:
             x_pre = self.module(x)
@@ -259,7 +263,7 @@ class CycleTime(nn.Module):
         # print("\n")
 
         B, T = video.shape[:2]
-        T = 4
+        T = 3
         # print("B: ", B, "T: ", T)
 
 

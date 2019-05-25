@@ -150,7 +150,6 @@ class ResNet(nn.Module):
 
     def forward(self, x):
 
-        print("IS THIS FORWARD USED?!?!?!?!?!?!")
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
