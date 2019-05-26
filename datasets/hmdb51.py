@@ -362,12 +362,12 @@ class HMDB51(data.Dataset):
             current_len = (self.videoLen  + self.predDistance) * frame_gap
             sample_duration = self.sample_duration
             startframe = 0
-            future_idx = sample_duration
+            future_idx = current_len
 
             if fnum >= sample_duration:
                 diff = fnum - sample_duration
                 startframe = random.randint(0, diff)
-                future_idx = startframe + sample_duration - 1
+                future_idx = startframe + current_len - 1
 
                 # print("start frame: ", startframe)
                 # print("future id:", future_idx)
@@ -378,7 +378,7 @@ class HMDB51(data.Dataset):
                 diffnum = fnum - newLen
                 startframe = random.randint(0, diffnum)
                 frame_gap = float(newLen - 1) / float(sample_duration)
-                future_idx = int(startframe + sample_duration * frame_gap)
+                future_idx = int(startframe + current_len * frame_gap)
 
                 print("start frame", startframe)
                 print("FUTURE ID:", future_idx)
@@ -387,16 +387,7 @@ class HMDB51(data.Dataset):
             crop_offset_y = -1
             ratio = random.random() * (4/3 - 3/4) + 3/4
 
-            future_id = []
-
-            for i in range(2):
-
-                newid = int(future_idx + i * frame_gap)
-
-                future_id.append(newid)
-                
-
-            frame_indices = list(range(startframe, (future_idx+1)))
+            frame_indices = list(range(startframe, (startframe+self.sample_duration)))
             
             #print("start frame: ", startframe, "future id:", future_idx, "Future id incides", future_id, "frame indices", frame_indices, len(frame_indices))
 
@@ -444,16 +435,51 @@ class HMDB51(data.Dataset):
 
                 video[i] = img.clone()
 
-                for j, i_d in enumerate(future_id):
-                    if nowid == i_d:
-                        future_imgs[j] = img.clone()
-                        imgs_target[j] = future_imgs[j].clone()
-
             # print("FUtUrE IMGS:", future_imgs.size(), "VIDEO:", video.size())
 
 
-            # print("VIDEO:", video.size(), "Frame indices:", frame_indices, "start frame:", startframe, "future _id ", future_idx, "future _ id sss ", future_id)
-         
+            for i in range(2):
+
+                newid = int(future_idx + 1 + i * frame_gap)
+                if newid > fnum:
+                    newid = fnum
+
+                newid = str(newid).zfill(5)
+                img_path = os.path.join(folder_path, "image_{}.jpg".format(newid))
+
+                img = load_image(img_path)  # CxHxW
+                ht, wd = img.size(1), img.size(2)
+                newh, neww = ht, wd
+                if ht <= wd:
+                    ratio  = float(wd) / float(ht)
+                    # width, height
+                    img = resize(img, int(self.imgSize * ratio), self.imgSize)
+                    newh = self.imgSize
+                    neww = int(self.imgSize * ratio)
+                else:
+                    ratio  = float(ht) / float(wd)
+                    # width, height
+                    img = resize(img, self.imgSize, int(self.imgSize * ratio))
+                    newh = int(self.imgSize * ratio)
+                    neww = self.imgSize
+
+                img = cropimg(img, crop_offset_x, crop_offset_y, self.cropSize)
+                assert(img.size(1) == self.cropSize)
+                assert(img.size(2) == self.cropSize)
+
+                if self.is_train:
+                    if toflip:
+                        img = torch.from_numpy(fliplr(img.numpy())).float()
+
+                mean=[0.485, 0.456, 0.406]
+                std=[0.229, 0.224, 0.225]
+                img = color_normalize(img, mean, std)
+
+                future_imgs[i] = img
+
+            for i in range(2):
+
+                imgs_target[i] = future_imgs[i].clone()
 
             flow_cmb = future_imgs[0] - future_imgs[1]
             flow_cmb = im_to_numpy(flow_cmb)

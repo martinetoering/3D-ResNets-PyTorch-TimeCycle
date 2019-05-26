@@ -35,7 +35,7 @@ def parse_opts():
         help='Annotation file path')
     parser.add_argument(
         '--result_path',
-        default='resnet50_sampleduration13_w100_bs4',
+        default='resnet50_sampleduration13_w100_bs4_videolen4',
         type=str,
         help='Result directory path')
     parser.add_argument(
@@ -67,7 +67,7 @@ def parse_opts():
         help='id(s) for CUDA_VISIBLE_DEVICES')
     parser.add_argument(
         '--predDistance', 
-        default=0, type=int,
+        default=4, type=int,
         help='predict how many frames away')
     parser.add_argument(
         '--seperate2d', 
@@ -98,7 +98,7 @@ def parse_opts():
         help='pretrained_imagenet')
     parser.add_argument(
         '--videoLen', 
-        default=3, 
+        default=4, 
         type=int,
         help='')
     parser.add_argument(

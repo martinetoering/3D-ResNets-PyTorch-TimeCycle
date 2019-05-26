@@ -156,6 +156,7 @@ if __name__ == '__main__':
     model = models.CycleTime(class_num=params['n_classes'], 
                              trans_param_num=3, 
                              frame_gap=opt.frame_gap,
+                             videoLen=opt.videoLen,
                              sample_duration=opt.sample_duration,
                              pretrained=opt.pretrained_imagenet, 
                              temporal_out=params['videoLen'], 

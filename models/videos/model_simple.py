@@ -31,6 +31,7 @@ class CycleTime(nn.Module):
                  frame_gap=4,
                  trans_param_num=3, 
                  sample_duration=13,
+                 videoLen=4,
                  detach_network=False, 
                  pretrained=False, 
                  temporal_out=4, 
@@ -45,6 +46,7 @@ class CycleTime(nn.Module):
 
         dim = 512
         self.frame_gap = frame_gap
+        self.videoLen = videoLen
         self.sample_duration = sample_duration 
 
         print("Pretrained Imagenet:", pretrained)
@@ -216,7 +218,7 @@ class CycleTime(nn.Module):
             x_pre, x_class = self.module(x)
 
             startframe = 0
-            futureid = startframe + self.sample_duration - 1
+            futureid = startframe + self.sample_duration
 
             x_pre = x_pre[:, :, startframe:futureid:self.frame_gap, :, :]
             # print("XPRE SIZE:", x_pre.size())
@@ -263,7 +265,7 @@ class CycleTime(nn.Module):
         # print("\n")
 
         B, T = video.shape[:2]
-        T = 3
+        T = self.videoLen
         # print("B: ", B, "T: ", T)
 
 
