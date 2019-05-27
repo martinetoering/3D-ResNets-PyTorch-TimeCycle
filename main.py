@@ -139,9 +139,15 @@ if __name__ == '__main__':
     print("Architecture:", opt.arch)
     print("Opt.mean", opt.mean)
     print("opt.std", opt.std)
-    
-    with open(os.path.join(opt.result_path, 'opts.json'), 'w') as opt_file:
-        json.dump(vars(opt), opt_file)
+
+    opts_file = os.path.join(opt.result_path, 'opts.json')
+    exists = os.path.isfile(opts_file)
+    if exists:
+        with open(opts_file, 'w') as opt_file:
+            json.dump(vars(opt), opt_file)
+    else:
+        with open(os.path.join(opt.result_path, 'resume_opts.json'), 'w') as opt_file:
+            json.dump(vars(opt), opt_file)
 
     # Random seed
     if opt.manualSeed is None:
@@ -232,7 +238,28 @@ if __name__ == '__main__':
         if not opt.no_train:
             optimizer.load_state_dict(checkpoint['optimizer'])
 
+        train_logger = Logger(
+           os.path.join(opt.result_path, 'train.log'),
+           ['epoch', 'loss', 'loss_vc', 'loss_overall', 'loss_sim', 'theta_loss', 'theta_skip_loss', 'acc', 'lr'])
+        train_batch_logger = Logger(
+           os.path.join(opt.result_path, 'train_batch.log'),
+           ['epoch', 'batch', 'iter', 'loss', 'loss_vc', 'loss_overall', 'loss_sim', 'theta_loss', 'theta_skip_loss', 'acc', 'lr'])
+
+        val_logger = Logger(
+            os.path.join(opt.result_path, 'val.log'), ['epoch', 'loss', 'acc'])
+
         del checkpoint
+
+    else:
+
+        train_logger = Logger(
+           os.path.join(opt.result_path, 'resume_{}_train.log'.format(opt.begin_epoch)),
+           ['epoch', 'loss', 'loss_vc', 'loss_overall', 'loss_sim', 'theta_loss', 'theta_skip_loss', 'acc', 'lr'])
+        train_batch_logger = Logger(
+           os.path.join(opt.result_path, 'resume_{}_train_batch.log'.format(opt.begin_epoch)),
+           ['epoch', 'batch', 'iter', 'loss', 'loss_vc', 'loss_overall', 'loss_sim', 'theta_loss', 'theta_skip_loss', 'acc', 'lr'])
+        val_logger = Logger(
+            os.path.join(opt.result_path, 'resume_{}_val.log'.format(opt.begin_epoch)), ['epoch', 'loss', 'acc'])
 
     if not opt.no_train:
 
@@ -289,13 +316,6 @@ if __name__ == '__main__':
         print("Train loader made")
 
 
-        train_logger = Logger(
-           os.path.join(opt.result_path, 'train.log'),
-           ['epoch', 'loss', 'loss_vc', 'loss_overall', 'loss_sim', 'theta_loss', 'theta_skip_loss', 'acc', 'lr'])
-        train_batch_logger = Logger(
-           os.path.join(opt.result_path, 'train_batch.log'),
-           ['epoch', 'batch', 'iter', 'loss', 'loss_vc', 'loss_overall', 'loss_sim', 'theta_loss', 'theta_skip_loss', 'acc', 'lr'])
-
         if opt.nesterov:
             dampening = 0
         else:
@@ -344,10 +364,10 @@ if __name__ == '__main__':
             opt.annotation_path,
             'validation',
             frame_gap=opt.frame_gap,
+            sample_duration=opt.sample_duration,
             n_samples_for_each_video=opt.n_val_samples,
             target_transform=target_transform,
-            geometric_transform=geometric_transform,
-            sample_duration=opt.sample_duration)
+            geometric_transform=geometric_transform)
 
         print("Validation data loaded")
 
@@ -361,8 +381,7 @@ if __name__ == '__main__':
         print("Validation loader done")
 
 
-        val_logger = Logger(
-            os.path.join(opt.result_path, 'val.log'), ['epoch', 'loss', 'acc'])
+    
 
     #print("MODEL:", model.state_dict().keys())
 

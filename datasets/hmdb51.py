@@ -226,13 +226,13 @@ class HMDB51(data.Dataset):
                  annotation_path,
                  subset,
                  frame_gap=1, 
+                 sample_duration=13,
                  augment=['crop', 'flip', 'frame_gap'],
                  n_samples_for_each_video=1,
                  spatial_transform=None,
                  temporal_transform=None,
                  target_transform=None,
-                 geometric_transform=None,
-                 sample_duration=25):
+                 geometric_transform=None):
 
         self.filelist = params['filelist']
         self.batch_size = params['batch_size']
@@ -389,12 +389,18 @@ class HMDB51(data.Dataset):
 
             frame_indices = list(range(startframe, (startframe+self.sample_duration)))
             
-            #print("start frame: ", startframe, "future id:", future_idx, "Future id incides", future_id, "frame indices", frame_indices, len(frame_indices))
+            # print("start frame: ", startframe, "future id:", future_idx, "frame indices", frame_indices, len(frame_indices))
+            
+            video_indices = []
 
             for i in range(sample_duration):
                 
                 nowid = int(startframe + i)
                 newid = nowid + 1
+
+                video_indices.append(newid)
+
+
                 newid = str(newid).zfill(5)
                 img_path = os.path.join(folder_path, "image_{}.jpg".format(newid))
 
@@ -434,13 +440,17 @@ class HMDB51(data.Dataset):
 
 
                 video[i] = img.clone()
+                
 
-            # print("FUtUrE IMGS:", future_imgs.size(), "VIDEO:", video.size())
 
+            future_imgs_indices = []
 
             for i in range(2):
 
                 newid = int(future_idx + 1 + i * frame_gap)
+                newid = newid + 1
+                future_imgs_indices.append(newid)
+
                 if newid > fnum:
                     newid = fnum
 
@@ -476,6 +486,13 @@ class HMDB51(data.Dataset):
                 img = color_normalize(img, mean, std)
 
                 future_imgs[i] = img
+
+                
+
+            #print("FUtUrE IMGS:", future_imgs.size(), "VIDEO:", video.size())
+            #print("video indices", video_indices, len(video_indices), "future imgs indices:", future_imgs_indices)
+
+            #exit()
 
             for i in range(2):
 

@@ -95,7 +95,7 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
 
         # Combine losses
 
-        loss = (100*loss) + loss_vc
+        loss = (50*loss) + loss_vc
 
         losses_combined.update(loss[0].data, video.size(0))
 

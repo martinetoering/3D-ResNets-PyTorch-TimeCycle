@@ -218,10 +218,9 @@ class CycleTime(nn.Module):
             x_pre, x_class = self.module(x)
 
             startframe = 0
-            futureid = startframe + self.sample_duration
+            futureid = startframe + self.videoLen * self.frame_gap
 
             x_pre = x_pre[:, :, startframe:futureid:self.frame_gap, :, :]
-            # print("XPRE SIZE:", x_pre.size())
 
         else:
             x_pre = self.module(x)

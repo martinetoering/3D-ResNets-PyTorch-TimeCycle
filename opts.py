@@ -35,7 +35,7 @@ def parse_opts():
         help='Annotation file path')
     parser.add_argument(
         '--result_path',
-        default='resnet50_sampleduration13_w100_bs4_videolen4',
+        default='resume_resnet50_sampleduration13_w50_bs4',
         type=str,
         help='Result directory path')
     parser.add_argument(
@@ -67,7 +67,7 @@ def parse_opts():
         help='id(s) for CUDA_VISIBLE_DEVICES')
     parser.add_argument(
         '--predDistance', 
-        default=4, type=int,
+        default=0, type=int,
         help='predict how many frames away')
     parser.add_argument(
         '--seperate2d', 
@@ -98,7 +98,7 @@ def parse_opts():
         help='pretrained_imagenet')
     parser.add_argument(
         '--videoLen', 
-        default=4, 
+        default=3, 
         type=int,
         help='')
     parser.add_argument(
@@ -230,7 +230,7 @@ def parse_opts():
         help='Number of validation samples for each activity')
     parser.add_argument(
         '--resume_path',
-        default='',
+        default='resume_resnet50_sampleduration13_w50_bs4_hmdb51_1/save_4.pth',
         type=str,
         help='Save data (.pth) of previous training')
     parser.add_argument(
