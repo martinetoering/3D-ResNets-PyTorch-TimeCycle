@@ -590,11 +590,9 @@ class HMDB51(data.Dataset):
 
             frame_indices = self.data[index]['frame_indices']
 
-            print("Frame indices:", frame_indices)
+            # print("Frame indices:", frame_indices)
 
             video = torch.Tensor(self.sample_duration, 3, self.cropSize, self.cropSize)
-
-            # print("IMGS:", imgs.size())
 
             for i, nowid in enumerate(frame_indices):
                 
@@ -615,17 +613,15 @@ class HMDB51(data.Dataset):
                     # width, height
                     img = resize(img, self.imgSize, int(self.imgSize * ratio))
 
+                
                 # Center crop, following KenshoHara
 
                 width, height = img.size(2), img.size(1)
-                # print("IMG before:", width, height)
 
                 x1 = int(round((width - 240) / 2.))
                 y1 = int(round((height - 240) / 2.))
 
                 img = cropimg(img, x1, y1, self.cropSize)
-
-                # print("IMG after:", img.size())
 
                 assert(img.size(1) == self.cropSize)
                 assert(img.size(2) == self.cropSize)

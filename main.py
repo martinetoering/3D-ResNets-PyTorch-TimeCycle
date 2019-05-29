@@ -147,21 +147,21 @@ if __name__ == '__main__':
     print("Sample Duration:", opt.sample_duration)
     print("Loss weight:", opt.loss_weight)
 
-    # model = models.CycleTime(class_num=params['n_classes'], 
-    #                          trans_param_num=3, 
-    #                          frame_gap=opt.frame_gap,
-    #                          videoLen=opt.videoLen,
-    #                          sample_duration=opt.sample_duration,
-    #                          pretrained=opt.pretrained_imagenet, 
-    #                          temporal_out=params['videoLen'], 
-    #                          T=opt.T, 
-    #                          hist=opt.hist)
+    model = models.CycleTime(class_num=params['n_classes'], 
+                             trans_param_num=3, 
+                             frame_gap=opt.frame_gap,
+                             videoLen=opt.videoLen,
+                             sample_duration=opt.sample_duration,
+                             pretrained=opt.pretrained_imagenet, 
+                             temporal_out=params['videoLen'], 
+                             T=opt.T, 
+                             hist=opt.hist)
 
-    # if not opt.no_cuda:
-    #     model = model.cuda()
+    if not opt.no_cuda:
+        model = model.cuda()
 
-    # cudnn.benchmark = False
-    # print(' Total params: %.2fM' % (sum(p.numel() for p in model.parameters())/1000000.0))
+    cudnn.benchmark = False
+    print(' Total params: %.2fM' % (sum(p.numel() for p in model.parameters())/1000000.0))
 
     
     criterion = nn.CrossEntropyLoss()
@@ -186,10 +186,10 @@ if __name__ == '__main__':
     print("\n")
 
     
-    # optimizer = optim.Adam(model.parameters(), 
-    #             lr=opt.learning_rate, 
-    #             betas=(opt.momentum, 0.999), 
-    #             weight_decay=opt.weight_decay)
+    optimizer = optim.Adam(model.parameters(), 
+                lr=opt.learning_rate, 
+                betas=(opt.momentum, 0.999), 
+                weight_decay=opt.weight_decay)
 
     print("\n")
     print("Adam Optimizer made")
@@ -312,14 +312,12 @@ if __name__ == '__main__':
 
         print("Learning rate:", opt.learning_rate)
         print("Momentum:", opt.momentum)
-        # print("Dampening:", opt.dampening)
         print("Weight decay:", opt.weight_decay)
-        # print("Nesterov:", opt.nesterov)
 
-        # scheduler = lr_scheduler.ReduceLROnPlateau(
-        #    optimizer, 
-        #    'min', 
-        #    patience=opt.lr_patience)
+        scheduler = lr_scheduler.ReduceLROnPlateau(
+           optimizer, 
+           'min', 
+           patience=opt.lr_patience)
 
         print("Lr_patience", opt.lr_patience)
 
@@ -339,12 +337,6 @@ if __name__ == '__main__':
 
         # temporal_transform = LoopPadding(opt.sample_duration)
         target_transform = ClassLabel()
-
-        # geometric_transform = GeometricTnf(
-        #     'affine', 
-        #     out_h=params['cropSize2'], 
-        #     out_w=params['cropSize2'], 
-        #     use_cuda = False)
 
         validation_data = HMDB51(
             params,
@@ -375,20 +367,20 @@ if __name__ == '__main__':
     print("\n")
 
 
-    # for i in range(opt.begin_epoch, opt.n_epochs + 1):
+    for i in range(opt.begin_epoch, opt.n_epochs + 1):
 
 
-        # if not opt.no_train:
+        if not opt.no_train:
 
-        #     loss, acc, main_loss, losses_theta, losses_theta_skip = train_epoch(i, params, train_loader, model, criterion, optimizer, opt, train_logger, train_batch_logger)
+            loss, acc, main_loss, losses_theta, losses_theta_skip = train_epoch(i, params, train_loader, model, criterion, optimizer, opt, train_logger, train_batch_logger)
 
-        # if not opt.no_val:
+        if not opt.no_val:
 
-        #     validation_loss = val_epoch(i, params, val_loader, model, criterion, opt, val_logger)
+            validation_loss = val_epoch(i, params, val_loader, model, criterion, opt, val_logger)
 
-        # if not opt.no_train and not opt.no_val:
+        if not opt.no_train and not opt.no_val:
 
-        #     scheduler.step(validation_loss)
+            scheduler.step(validation_loss)
 
 
     if not opt.no_test:
@@ -422,7 +414,7 @@ if __name__ == '__main__':
             num_workers=opt.n_threads,
             pin_memory=True)
         
-        # test.test(test_loader, model, opt, test_data.class_names)
+        test.test(test_loader, model, opt, test_data.class_names)
 
     if not opt.no_eval:
 

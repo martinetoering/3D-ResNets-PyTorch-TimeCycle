@@ -70,7 +70,7 @@ class CycleTime(nn.Module):
 
         print('self.T:', self.T)
 
-        self.afterconv1 = nn.Conv3d(1024, 18, kernel_size=1, bias=False)
+        self.afterconv1 = nn.Conv3d(1024, 512, kernel_size=1, bias=False)
 
         self.spatial_out1 = 30
         self.spatial_out2 = 10
@@ -221,7 +221,7 @@ class CycleTime(nn.Module):
             futureid = startframe + self.videoLen * self.frame_gap
 
             x_pre = x_pre[:, :, startframe:futureid:self.frame_gap, :, :]
-            print("XPRE SIZE:", x_pre.size())
+            # print("XPRE SIZE:", x_pre.size())
 
         else:
             x_pre = self.module(x)
