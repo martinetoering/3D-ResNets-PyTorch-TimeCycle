@@ -18,6 +18,11 @@ def parse_opts():
         help='Weight to multiply TimeCycle loss with before adding to classification loss')
 
     parser.add_argument(
+        '--weight_loss',
+        default=100,
+        type=int,
+        help='Weight')
+    parser.add_argument(
         '--root_path',
         default='/home/mtoering/data',
         type=str,
@@ -251,6 +256,50 @@ def parse_opts():
     #     '--nesterov', action='store_true', help='Nesterov momentum')
     # parser.set_defaults(nesterov=False)
 
+
+    parser.add_argument(
+        '--lr_patience',
+        default=10,
+        type=int,
+        help='Patience of LR scheduler. See documentation of ReduceLROnPlateau.'
+    )
+    parser.add_argument(
+        '--batch_size', 
+        default=4, 
+        type=int, 
+        help='Batch Size')
+    parser.add_argument(
+        '--n_epochs',
+        default=100,
+        type=int,
+        help='Number of total epochs to run')
+    parser.add_argument(
+        '--begin_epoch',
+        default=0,
+        type=int,
+        help=
+        'Training begins at this epoch. Previous trained model indicated by resume_path is loaded.'
+    )
+    parser.add_argument(
+        '--n_val_samples',
+        default=3,
+        type=int,
+        help='Number of validation samples for each activity')
+    parser.add_argument(
+        '--resume_path',
+        default='',
+        type=str,
+        help='Save data (.pth) of previous training')
+    parser.add_argument(
+        '--pretrain_path', 
+        default='', 
+        type=str, 
+        help='Pretrained model (.pth)')
+    parser.add_argument(
+        '--ft_begin_index',
+        default=0,
+        type=int,
+        help='Begin block index of fine-tuning')
 
     parser.add_argument(
         '--no_train',
