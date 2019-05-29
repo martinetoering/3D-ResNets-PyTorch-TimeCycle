@@ -1,7 +1,10 @@
-# TimeCycle
-
+import os
+import sys
+import json
+import numpy as np
 import torch
-import torch.nn as nn
+from torch import nn
+from torch.optim import lr_scheduler
 import torch.nn.parallel
 import torch.backends.cudnn as cudnn
 import torch.optim as optim
@@ -10,36 +13,15 @@ import torchvision.transforms as transforms
 import torch.nn.functional as F
 
 import argparse
-import os
-import shutil
-import time
 import random
-
-import numpy as np
 import pickle
 import scipy.misc
 
-import utils.imutils2
 import models.videos.model_simple as models
-# from utils import Logger, AverageMeter, savefig
-
-import models.dataset.vlog_train as vlog
 
 from opts import parse_opts
-
 from geotnf.transformation import GeometricTnf
 
-# 3D-ResNets
-
-import os
-import sys
-import json
-import numpy as np
-import torch
-from torch import nn
-from torch.optim import lr_scheduler
-
-from opts import parse_opts
 from mean import get_mean, get_std
 from spatial_transforms import (
     Compose, Normalize, Scale, CenterCrop, CornerCrop, MultiScaleCornerCrop,
@@ -54,7 +36,7 @@ from validation import val_epoch
 import test
 import eval_hmdb51
 
-import os
+
 
 def partial_load(pretrained_dict, model):
     model_dict = model.state_dict()
@@ -78,8 +60,10 @@ def get_params(opt):
 
     state = {k: v for k, v in opt._get_kwargs()}
 
+    print('\n')
+
     params['predDistance'] = state['predDistance']
-    print(params['predDistance'])
+    print('predDistance: ' + str(params['predDistance']))
 
     params['batch_size'] = state['batch_size']
     print('batch_size: ' + str(params['batch_size']) )
@@ -112,13 +96,17 @@ if __name__ == '__main__':
 
     if opt.root_path != '':
         opt.video_path = os.path.join(opt.root_path, opt.video_path)
-        opt.list = os.path.join(opt.root_path, opt.list)
+        split_list = opt.list.split("_")[1][0]
+        split_annotation = opt.annotation_path.split("_")[1][0]
+        if split_list != split_annotation:
+            print("Please provide list and annotation for same split")
+            exit()
         split = opt.annotation_path.split(".")[0]
-        print("SPLIT:", split)
+        print("Split of HMDB51:", split)
         opt.annotation_path = os.path.join(opt.root_path, opt.annotation_path)
+        opt.list = os.path.join(opt.root_path, opt.list)
         folder = opt.result_path
         opt.result_path = os.path.join(opt.root_path, opt.result_path + "_" + split)
-        print("Result path:", opt.result_path)
         if not os.path.isdir(opt.result_path):
             os.mkdir(opt.result_path)
         if opt.resume_path:
@@ -130,24 +118,15 @@ if __name__ == '__main__':
 
     print("Result path:", opt.result_path)
 
-    opt.scales = [opt.initial_scale]
-    for i in range(1, opt.n_scales):
-        opt.scales.append(opt.scales[-1] * opt.scale_step)
+    # opt.scales = [opt.initial_scale]
+    # for i in range(1, opt.n_scales):
+    #     opt.scales.append(opt.scales[-1] * opt.scale_step)
     opt.arch = '{}-{}'.format(opt.model, opt.model_depth)
-    opt.mean = get_mean(opt.norm_value, dataset=opt.mean_dataset)
-    opt.std = get_std(opt.norm_value)
+    # opt.mean = get_mean(opt.norm_value, dataset=opt.mean_dataset)
+    # opt.std = get_std(opt.norm_value)
     print("Architecture:", opt.arch)
-    print("Opt.mean", opt.mean)
-    print("opt.std", opt.std)
-
-    opts_file = os.path.join(opt.result_path, 'opts.json')
-    exists = os.path.isfile(opts_file)
-    if exists:
-        with open(opts_file, 'w') as opt_file:
-            json.dump(vars(opt), opt_file)
-    else:
-        with open(os.path.join(opt.result_path, 'resume_opts.json'), 'w') as opt_file:
-            json.dump(vars(opt), opt_file)
+    # print("Opt.mean", opt.mean)
+    # print("opt.std", opt.std)
 
     # Random seed
     if opt.manualSeed is None:
@@ -159,35 +138,45 @@ if __name__ == '__main__':
 
     best_loss = 0  # best test accuracy
 
-    model = models.CycleTime(class_num=params['n_classes'], 
-                             trans_param_num=3, 
-                             frame_gap=opt.frame_gap,
-                             videoLen=opt.videoLen,
-                             sample_duration=opt.sample_duration,
-                             pretrained=opt.pretrained_imagenet, 
-                             temporal_out=params['videoLen'], 
-                             T=opt.T, 
-                             hist=opt.hist)
+    print("\n")
 
-    if not opt.no_cuda:
-        model = model.cuda()
+    print("Sample Size:", opt.sample_size)
+    print("Video Len:", opt.videoLen)
+    print("Frame Gap:", opt.frame_gap)
+    print("Pred Distance:", opt.predDistance)
+    print("Sample Duration:", opt.sample_duration)
+    print("Loss weight:", opt.loss_weight)
 
-    cudnn.benchmark = False
-    print('    Total params: %.2fM' % (sum(p.numel() for p in model.parameters())/1000000.0))
+    # model = models.CycleTime(class_num=params['n_classes'], 
+    #                          trans_param_num=3, 
+    #                          frame_gap=opt.frame_gap,
+    #                          videoLen=opt.videoLen,
+    #                          sample_duration=opt.sample_duration,
+    #                          pretrained=opt.pretrained_imagenet, 
+    #                          temporal_out=params['videoLen'], 
+    #                          T=opt.T, 
+    #                          hist=opt.hist)
+
+    # if not opt.no_cuda:
+    #     model = model.cuda()
+
+    # cudnn.benchmark = False
+    # print(' Total params: %.2fM' % (sum(p.numel() for p in model.parameters())/1000000.0))
+
     
     criterion = nn.CrossEntropyLoss()
     if not opt.no_cuda:
         criterion = criterion.cuda()
 
-    if not opt.mean_norm and not opt.std_norm:
-        norm_method = Normalize([0, 0, 0], [1, 1, 1])
-        print("Norm method 0")
-    elif not opt.std_norm:
-        norm_method = Normalize(opt.mean, [1, 1, 1])
-        print("Norm method 1")
-    else:
-        norm_method = Normalize(opt.mean, opt.std)
-        print("Norm method 2")
+    # if not opt.mean_norm and not opt.std_norm:
+    #     norm_method = Normalize([0, 0, 0], [1, 1, 1])
+    #     print("Norm method 0")
+    # elif not opt.std_norm:
+    #     norm_method = Normalize(opt.mean, [1, 1, 1])
+    #     print("Norm method 1")
+    # else:
+    #     norm_method = Normalize(opt.mean, opt.std)
+    #     print("Norm method 2")
 
     print('Weight_decay: ' + str(opt.weight_decay))
     print('Beta1: ' + str(opt.momentum))
@@ -196,24 +185,14 @@ if __name__ == '__main__':
     print("LOADING PRETRAIN/RESUME AND LOGGER")
     print("\n")
 
-    if opt.optimizer == 'adam':
-        optimizer = optim.Adam(model.parameters(), 
-                    lr=opt.learning_rate, 
-                    betas=(opt.momentum, 0.999), 
-                    weight_decay=opt.weight_decay)
-        print("Adam")
-    else:
-        optimizer = optim.SGD(model.parameters(), 
-                          lr=opt.learning_rate, 
-                          weight_decay=opt.weight_decay, 
-                          momentum=0.95
-                          #dampening=0.9,
-                          #nesterov=False
-                          )
-        print("SGD")
+    
+    # optimizer = optim.Adam(model.parameters(), 
+    #             lr=opt.learning_rate, 
+    #             betas=(opt.momentum, 0.999), 
+    #             weight_decay=opt.weight_decay)
 
     print("\n")
-    print("Optimizer made")
+    print("Adam Optimizer made")
 
     if opt.pretrain_path:
         # Load checkpoint.
@@ -224,7 +203,6 @@ if __name__ == '__main__':
         partial_load(checkpoint['state_dict'], model)
 
         del checkpoint
-
 
     if opt.resume_path:
         # Load checkpoint.
@@ -239,27 +217,40 @@ if __name__ == '__main__':
             optimizer.load_state_dict(checkpoint['optimizer'])
 
         train_logger = Logger(
-           os.path.join(opt.result_path, 'train.log'),
+           os.path.join(opt.result_path, 'train_resume_{}.log'.format(opt.begin_epoch)),
            ['epoch', 'loss', 'loss_vc', 'loss_overall', 'loss_sim', 'theta_loss', 'theta_skip_loss', 'acc', 'lr'])
         train_batch_logger = Logger(
-           os.path.join(opt.result_path, 'train_batch.log'),
+           os.path.join(opt.result_path, 'train_batch_resume_{}.log'.format(opt.begin_epoch)),
            ['epoch', 'batch', 'iter', 'loss', 'loss_vc', 'loss_overall', 'loss_sim', 'theta_loss', 'theta_skip_loss', 'acc', 'lr'])
 
         val_logger = Logger(
-            os.path.join(opt.result_path, 'val.log'), ['epoch', 'loss', 'acc'])
+            os.path.join(opt.result_path, 'val_resume_{}.log'.format(opt.begin_epoch)), ['epoch', 'loss', 'acc'])
 
+        opts_file = os.path.join(opt.result_path, 'opts_resume_{}.json'.format(opt.begin_epoch))
+        
         del checkpoint
 
     else:
 
         train_logger = Logger(
-           os.path.join(opt.result_path, 'resume_{}_train.log'.format(opt.begin_epoch)),
+           os.path.join(opt.result_path, 'train.log'),
            ['epoch', 'loss', 'loss_vc', 'loss_overall', 'loss_sim', 'theta_loss', 'theta_skip_loss', 'acc', 'lr'])
         train_batch_logger = Logger(
-           os.path.join(opt.result_path, 'resume_{}_train_batch.log'.format(opt.begin_epoch)),
+           os.path.join(opt.result_path, 'train_batch.log'),
            ['epoch', 'batch', 'iter', 'loss', 'loss_vc', 'loss_overall', 'loss_sim', 'theta_loss', 'theta_skip_loss', 'acc', 'lr'])
         val_logger = Logger(
-            os.path.join(opt.result_path, 'resume_{}_val.log'.format(opt.begin_epoch)), ['epoch', 'loss', 'acc'])
+            os.path.join(opt.result_path, 'val.log'), ['epoch', 'loss', 'acc'])
+
+        opts_file = os.path.join(opt.result_path, 'opts.json')
+
+    
+    print("\n")
+    print("Save opts at", opts_file)
+
+    with open(opts_file, 'w') as opt_file:
+        json.dump(vars(opt), opt_file)
+
+    
 
     if not opt.no_train:
 
@@ -283,7 +274,8 @@ if __name__ == '__main__':
         #     ToTensor(opt.norm_value), norm_method
         # ])
 
-        temporal_transform = TemporalRandomCrop(opt.sample_duration)
+        # temporal_transform = TemporalRandomCrop(opt.sample_duration)
+        
         target_transform = ClassLabel()
 
         geometric_transform = GeometricTnf(
@@ -292,7 +284,6 @@ if __name__ == '__main__':
             out_w=params['cropSize2'], 
             use_cuda = False)
 
-        print("PARAMS:", type(params))
         training_data = HMDB51(
             params,
             opt.video_path,
@@ -301,7 +292,6 @@ if __name__ == '__main__':
             frame_gap=opt.frame_gap,
             sample_duration=opt.sample_duration,
             target_transform=target_transform,
-            temporal_transform=temporal_transform,
             geometric_transform=geometric_transform)
 
         print("Training data obtained")
@@ -315,24 +305,22 @@ if __name__ == '__main__':
 
         print("Train loader made")
 
-
-        if opt.nesterov:
-            dampening = 0
-        else:
-            dampening = opt.dampening
+        # if opt.nesterov:
+        #     dampening = 0
+        # else:
+        #     dampening = opt.dampening
 
         print("Learning rate:", opt.learning_rate)
         print("Momentum:", opt.momentum)
-        print("Dampening:", opt.dampening)
+        # print("Dampening:", opt.dampening)
         print("Weight decay:", opt.weight_decay)
-        print("Nesterov:", opt.nesterov)
+        # print("Nesterov:", opt.nesterov)
 
-        scheduler = lr_scheduler.ReduceLROnPlateau(
-           optimizer, 
-           'min', 
-           patience=opt.lr_patience)
+        # scheduler = lr_scheduler.ReduceLROnPlateau(
+        #    optimizer, 
+        #    'min', 
+        #    patience=opt.lr_patience)
 
-        print("\n")
         print("Lr_patience", opt.lr_patience)
 
         print("\n")
@@ -343,31 +331,30 @@ if __name__ == '__main__':
         print("VALIDATION")
         print("\n")
 
-        spatial_transform = Compose([
-            Scale(opt.sample_size),
-            CenterCrop(opt.sample_size),
-            ToTensor(opt.norm_value), norm_method
-        ])
+        # spatial_transform = Compose([
+        #     Scale(opt.sample_size),
+        #     CenterCrop(opt.sample_size),
+        #     ToTensor(opt.norm_value), norm_method
+        # ])
 
-        temporal_transform = LoopPadding(opt.sample_duration)
+        # temporal_transform = LoopPadding(opt.sample_duration)
         target_transform = ClassLabel()
 
-        geometric_transform = GeometricTnf(
-            'affine', 
-            out_h=params['cropSize2'], 
-            out_w=params['cropSize2'], 
-            use_cuda = False)
+        # geometric_transform = GeometricTnf(
+        #     'affine', 
+        #     out_h=params['cropSize2'], 
+        #     out_w=params['cropSize2'], 
+        #     use_cuda = False)
 
         validation_data = HMDB51(
             params,
             opt.video_path,
             opt.annotation_path,
             'validation',
-            frame_gap=opt.frame_gap,
             sample_duration=opt.sample_duration,
             n_samples_for_each_video=opt.n_val_samples,
-            target_transform=target_transform,
-            geometric_transform=geometric_transform)
+            target_transform=target_transform)
+
 
         print("Validation data loaded")
 
@@ -379,8 +366,6 @@ if __name__ == '__main__':
             pin_memory=True)
 
         print("Validation loader done")
-
-
     
 
     #print("MODEL:", model.state_dict().keys())
@@ -389,29 +374,21 @@ if __name__ == '__main__':
     print("RUNNING")
     print("\n")
 
-    for i in range(opt.begin_epoch, opt.n_epochs + 1):
+
+    # for i in range(opt.begin_epoch, opt.n_epochs + 1):
 
 
-        if not opt.no_train:
+        # if not opt.no_train:
 
+        #     loss, acc, main_loss, losses_theta, losses_theta_skip = train_epoch(i, params, train_loader, model, criterion, optimizer, opt, train_logger, train_batch_logger)
 
-            #print("Train epoch")
+        # if not opt.no_val:
 
-            loss, acc, main_loss, losses_theta, losses_theta_skip = train_epoch(i, params, train_loader, model, criterion, optimizer, opt, train_logger, train_batch_logger)
+        #     validation_loss = val_epoch(i, params, val_loader, model, criterion, opt, val_logger)
 
+        # if not opt.no_train and not opt.no_val:
 
-        if not opt.no_val:
-
-            #print("Val epoch")
-
-            validation_loss = val_epoch(i, params, val_loader, model, criterion, opt,
-                                        val_logger)
-
-        if not opt.no_train and not opt.no_val:
-
-            #print("Lr schedule")
-
-            scheduler.step(validation_loss)
+        #     scheduler.step(validation_loss)
 
 
     if not opt.no_test:
@@ -420,26 +397,23 @@ if __name__ == '__main__':
 
         print("TESTING")
 
-        spatial_transform = Compose([
-            Scale(int(opt.sample_size / opt.scale_in_test)),
-            CornerCrop(opt.sample_size, opt.crop_position_in_test),
-            ToTensor(opt.norm_value), norm_method
-        ])
+        # spatial_transform = Compose([
+        #     Scale(int(opt.sample_size / opt.scale_in_test)),
+        #     CornerCrop(opt.sample_size, opt.crop_position_in_test),
+        #     ToTensor(opt.norm_value), norm_method
+        # ])
 
-        temporal_transform = LoopPadding(opt.sample_duration)
-
+        # temporal_transform = LoopPadding(opt.sample_duration)
         target_transform = VideoID()
-
-        subset = "validation"
 
         test_data =  HMDB51(
             params,
             opt.video_path,
             opt.annotation_path,
-            subset,
+            "validation",
+            sample_duration=opt.sample_duration,
             n_samples_for_each_video=0,
-            target_transform=target_transform,
-            sample_duration=opt.sample_duration)
+            target_transform=target_transform)
 
         test_loader = torch.utils.data.DataLoader(
             test_data,
@@ -448,7 +422,7 @@ if __name__ == '__main__':
             num_workers=opt.n_threads,
             pin_memory=True)
         
-        test.test(test_loader, model, opt, test_data.class_names)
+        # test.test(test_loader, model, opt, test_data.class_names)
 
     if not opt.no_eval:
 
@@ -463,6 +437,6 @@ if __name__ == '__main__':
         prediction = os.path.join(opt.result_path, "val.json")
         subset = "validation"
 
-        eval_hmdb51.eval_hmdb51(name, opt.annotation_path, prediction, subset, 1)
+        eval_hmdb51.eval_hmdb51(name, opt.annotation_path, prediction, subset, opt.top_k)
 
 

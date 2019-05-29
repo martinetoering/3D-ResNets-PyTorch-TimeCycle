@@ -31,7 +31,7 @@ class HMDBclassification(object):
 
         with open(name, 'w') as f:
             f.write('{}\n'.format(name))
-            print("Write evaluation results to file")
+            print("Write evaluation results to file:", name)
             f.write('[INIT] Loaded annotations from {} subset.\n'.format(subset))
             nr_gt = len(self.ground_truth)
             f.write('\tNumber of ground truth instances: {}\n'.format(nr_gt))

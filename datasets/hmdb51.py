@@ -59,21 +59,21 @@ def make_dataset(root_path, annotation_path, subset, n_samples_for_each_video,
     data = load_annotation_data(annotation_path)
 
     print("Making dataset", subset)
+    
     video_names, annotations = get_video_names_and_annotations(data, subset)
 
-    print("Video names", len(video_names))
-    print("Annotations", len(annotations))
+    # print("Video names", len(video_names))
+    # print("Annotations", len(annotations))
 
     class_to_idx = get_class_labels(data)
-    print("Class_to_idx", len(class_to_idx))
-    #print("Class_to_idx", (class_to_idx))
+    
+    # print("Class_to_idx", len(class_to_idx))
 
     idx_to_class = {}
     for name, label in class_to_idx.items():
         idx_to_class[label] = name
 
-    print("Idx_to_class", len(idx_to_class))
-    #print("Idx_to_class", (idx_to_class))
+    # print("Idx_to_class", len(idx_to_class))
 
     dataset = []
     gap_dataset = []
@@ -93,13 +93,6 @@ def make_dataset(root_path, annotation_path, subset, n_samples_for_each_video,
         if n_frames <= 0:
             continue
 
-
-        frame_gap = frame_gap
-        current_len = (sample_duration  + predDistance) * frame_gap
-
-        startframe = 0
-        future_idx = current_len
-
         begin_t = 1
         end_t = n_frames
         sample = {
@@ -108,7 +101,6 @@ def make_dataset(root_path, annotation_path, subset, n_samples_for_each_video,
             'n_frames': n_frames,
             'video_id': video_names[i].split('/')[1]
         }
-
 
         if len(annotations) != 0:
             sample['label'] = class_to_idx[annotations[i]['label']]
@@ -123,7 +115,6 @@ def make_dataset(root_path, annotation_path, subset, n_samples_for_each_video,
         gap_sample = copy.deepcopy(sample)
 
 
-
         if n_samples_for_each_video == 1:
             sample['frame_indices'] = list(range(1, n_frames + 1))
             
@@ -133,8 +124,7 @@ def make_dataset(root_path, annotation_path, subset, n_samples_for_each_video,
 
             gap_dataset.append(gap_sample)
 
-
-            # print(sample)
+            # print("Sample:", sample)
         
             # exit() 
 
@@ -143,6 +133,7 @@ def make_dataset(root_path, annotation_path, subset, n_samples_for_each_video,
                 # print("Number of samples:", n_samples_for_each_video)
                 # print("n_frames:", n_frames)
                 # print("Sample duration:", sample_duration)
+
                 step = max(1,
                            math.ceil((n_frames - 1 - sample_duration) /
                                      (n_samples_for_each_video - 1)))
@@ -169,9 +160,9 @@ def make_dataset(root_path, annotation_path, subset, n_samples_for_each_video,
 
                 gap_dataset.append(gap_sample_j)
 
-                #print(sample_j)
+                # print("Sample j:", sample_j)
 
-            #exit() 
+            # exit() 
 
     return name_to_sample, dataset, gap_dataset, idx_to_class, path_to_id
 
@@ -234,6 +225,11 @@ class HMDB51(data.Dataset):
                  target_transform=None,
                  geometric_transform=None):
 
+        if subset == "training":
+            self.is_train = True
+        else:
+            self.is_train = False
+
         self.filelist = params['filelist']
         self.batch_size = params['batch_size']
         self.imgSize = params['imgSize']
@@ -241,43 +237,28 @@ class HMDB51(data.Dataset):
         self.cropSize2 = params['cropSize2']
         self.videoLen = params['videoLen']
 
-        print("\n")
-        print("Filelist:", self.filelist)
-        print("Batch size:", self.batch_size)
-        print("Image size:", self.imgSize)
-        print("cropSize:", self.cropSize)
-        print("cropSize2:", self.cropSize2)
-        print("Videolen:", self.videoLen)
-
         # Prediction distance, how many frames far away
         self.predDistance = params['predDistance']
 
-        print("Prediction distance:", self.predDistance)
-
         # Offset x,y parameters
         self.offset = params['offset']
-
-        print("Ofset:", self.offset)
-        
+       
         # GridSize = 3
         self.gridSize = params['gridSize']
 
-        print("Grid size:", self.gridSize)
-
-        if subset == "training":
-            self.is_train = True
-        else:
-            self.is_train = False
-
         self.frame_gap = frame_gap
 
-        print("Is train:", self.is_train)
+        print("\n")
+        print("Batch size:", self.batch_size)
+        print("Videolen:", self.videoLen)
         print("Frame gap:", self.frame_gap)
+        print("Prediction distance:", self.predDistance)
+        print("Ofset:", self.offset)
+        print("Grid size:", self.gridSize)
 
         self.augment = augment
 
         print("Augment:", self.augment)
-
 
         f = open(self.filelist, 'r')
 
@@ -298,23 +279,21 @@ class HMDB51(data.Dataset):
 
         print("\n")
 
-        print("Make dataset:", subset)
-        print("Number of samples for each video:", n_samples_for_each_video)
-        print("Sample duration:", sample_duration)        
-
-        
         self.sample_duration = sample_duration
-
         self.name_to_sample, self.data, self.gap_data, self.class_names, self.path_to_id = make_dataset(
             root_path, annotation_path, subset, n_samples_for_each_video, frame_gap,
             sample_duration, self.predDistance)
 
+        print("Dataset:", subset)
+        print("Number of samples for each video:", n_samples_for_each_video)
+        print("Sample duration:", sample_duration)        
+
         if self.is_train:
             self.target_ids = []
-            print("JPG FILES:", len(self.jpgfiles))
+            #print("JPG FILES:", len(self.jpgfiles))
             for path in self.jpgfiles:
                 self.target_ids.append(self.path_to_id[path])
-            print("TARGETIDS:", len(self.target_ids))
+            #print("TARGETIDS:", len(self.target_ids))
 
         print("\n")
         print("Total Data", len(self.data))
@@ -322,9 +301,6 @@ class HMDB51(data.Dataset):
         self.spatial_transform = spatial_transform
         self.temporal_transform = temporal_transform
         self.target_transform = target_transform
-
-
-        # self.loader = get_loader()
 
         print("\n")
 
@@ -614,7 +590,7 @@ class HMDB51(data.Dataset):
 
             frame_indices = self.data[index]['frame_indices']
 
-            # print("Frame indices:", frame_indices)
+            print("Frame indices:", frame_indices)
 
             video = torch.Tensor(self.sample_duration, 3, self.cropSize, self.cropSize)
 

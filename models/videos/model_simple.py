@@ -1,5 +1,3 @@
-# from __future__ import absolute_import
-
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
@@ -27,11 +25,11 @@ class CycleTime(nn.Module):
 
     def __init__(self, 
                  class_num=8, 
+                 trans_param_num=3,
                  dim_in=2048, 
                  frame_gap=4,
-                 trans_param_num=3, 
-                 sample_duration=13,
                  videoLen=4,
+                 sample_duration=13,
                  detach_network=False, 
                  pretrained=False, 
                  temporal_out=4, 
@@ -45,18 +43,20 @@ class CycleTime(nn.Module):
         print("\n")
 
         dim = 512
+
         self.frame_gap = frame_gap
         self.videoLen = videoLen
         self.sample_duration = sample_duration 
 
+        print("Frame gap:", frame_gap)
+        print("Video Len:", videoLen)
+        print("Sample Duration:", sample_duration)
         print("Pretrained Imagenet:", pretrained)
 
         resnet = resnet_res4s1.resnet50(pretrained=pretrained)
-        #resnet = resnet_res4s1.multi_output_model(resnet, pretrained=pretrained)
         self.module = inflated_resnet.InflatedResNet(copy.deepcopy(resnet), sample_duration)
 
         #print(self.module)
-
 
         self.detach_network = detach_network
         self.hist = hist
@@ -221,6 +221,7 @@ class CycleTime(nn.Module):
             futureid = startframe + self.videoLen * self.frame_gap
 
             x_pre = x_pre[:, :, startframe:futureid:self.frame_gap, :, :]
+            print("XPRE SIZE:", x_pre.size())
 
         else:
             x_pre = self.module(x)
@@ -266,8 +267,6 @@ class CycleTime(nn.Module):
         B, T = video.shape[:2]
         T = self.videoLen
         # print("B: ", B, "T: ", T)
-
-
         
         videoclip1  = video
 
@@ -434,8 +433,6 @@ class CycleTime(nn.Module):
         return r50_class, (outputs[:2], patch2_feat2, theta, trans_out2, trans_out3, skip_trans, skip_corrfeat_mat, corrfeat_trans_matrix2)
         
         
-        
-
 
     def loss(self, outputs, patch_feat, theta, trans_out2, trans_out3, skip_trans, skip_corrfeat_mat, corrfeat_trans_matrix2):
         # patch_feat is patch of target frame, theta is crop transform for patch

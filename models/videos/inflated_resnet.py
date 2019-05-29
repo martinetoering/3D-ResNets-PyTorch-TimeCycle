@@ -8,7 +8,6 @@ from . import inflate
 class InflatedResNet(torch.nn.Module):
     def __init__(self, 
                  resnet2d, 
-                 frame_nb=4, 
                  sample_duration=13,
                  class_nb=1000, 
                  conv_class=True):

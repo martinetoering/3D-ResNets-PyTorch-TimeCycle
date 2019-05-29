@@ -157,38 +157,14 @@ class ResNet(nn.Module):
 
         x = self.layer1(x)
         x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
 
-        # x = self.layer3(x)
-        # x = self.layer4(x)
+        x = self.avgpool(x)
+        x = x.view(x.size(0), -1)
+        x = self.fc(x)
 
-        # x = self.avgpool(x)
-        # x = x.view(x.size(0), -1)
-        # x = self.fc(x)
-
-        head_0 = self.layer3(x)
-        head_0= self.layer4(head_0)
-
-        head_0 = self.avgpool(head_0)
-        head_0 = head_0.view(head_0.size(0), -1)
-        head_0 = self.fc(head_0)
-
-
-        head_1 = self.layer3_b(x)
-        head_1 = self.layer4(head_1)
-
-        head_1 = self.avgpool(head_1)
-        head_1 = head_1.view(head_1.size(0), -1)
-        head_1 = self.fc(head_1)
-
-        return head_0, head_1
-
-
-def multi_output_model(core_model, pretrained=False, **kwargs):
-    model = Multi_output_model(core_model, BasicBlock, [2, 2, 2, 2], **kwargs)
-    if pretrained:
-        model.load_state_dict(model_zoo.load_url(model_urls['resnet18']))
-    return model
-
+        return x
 
 def resnet18(pretrained=False, **kwargs):
     """Constructs a ResNet-18 model.
