@@ -13,6 +13,11 @@ def parse_opts():
 
 
     parser.add_argument(
+        '--weight_loss',
+        default=100,
+        type=int,
+        help='Weight')
+    parser.add_argument(
         '--root_path',
         default='/home/martine/data',
         type=str,
@@ -35,7 +40,7 @@ def parse_opts():
         help='Annotation file path')
     parser.add_argument(
         '--result_path',
-        default='resume_resnet50_sampleduration13_w50_bs4',
+        default='test',
         type=str,
         help='Result directory path')
     parser.add_argument(
@@ -230,7 +235,7 @@ def parse_opts():
         help='Number of validation samples for each activity')
     parser.add_argument(
         '--resume_path',
-        default='resume_resnet50_sampleduration13_w50_bs4_hmdb51_1/save_4.pth',
+        default='',
         type=str,
         help='Save data (.pth) of previous training')
     parser.add_argument(

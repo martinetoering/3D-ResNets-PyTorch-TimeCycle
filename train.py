@@ -95,9 +95,9 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
 
         # Combine losses
 
-        loss = (50*loss) + loss_vc
+        loss_combined = (opt.weight_loss*loss) + loss_vc
 
-        losses_combined.update(loss[0].data, video.size(0))
+        losses_combined.update(loss_combined[0].data, video.size(0))
 
         accuracies.update(acc_vc, video.size(0))
        
@@ -105,7 +105,7 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
         
         # Combine losses
 
-        loss.backward()
+        loss_combined.backward()
 
         torch.nn.utils.clip_grad_norm(model.parameters(), 10.0)
 
