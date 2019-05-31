@@ -21,9 +21,7 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
 
     batch_time = AverageMeter()
     data_time = AverageMeter()
-
-    losses = AverageMeter()
-    accuracies = AverageMeter()
+  
 
     # TimeCycle
     main_loss = AverageMeter() # The feature similarity
@@ -31,11 +29,6 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
     losses_theta_skip = AverageMeter() 
     losses_overall = AverageMeter() # Combination of the three
 
-    # Classification
-    losses_vc = AverageMeter()
-
-    # Combined
-    losses_combined = AverageMeter()
 
     losses_dict = dict(
         cnt_trackers=None,
@@ -43,6 +36,15 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
         loss_targ_theta=None,
         loss_targ_theta_skip=None
     )
+    
+
+    # Classification
+    losses_vc = AverageMeter()
+    accuracies = AverageMeter()
+
+    # Combined
+    losses_combined = AverageMeter()
+
 
     end_time = time.time()
     

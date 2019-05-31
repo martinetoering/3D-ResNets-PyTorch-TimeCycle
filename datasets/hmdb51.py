@@ -270,10 +270,15 @@ class HMDB51(data.Dataset):
             jpgfile = rows[0]
             fnum = int(rows[1])
 
-            self.jpgfiles.append(jpgfile)
-            self.fnums.append(fnum)
+            if os.path.exists(jpgfile): 
+                self.jpgfiles.append(jpgfile)
+                self.fnums.append(fnum)
 
         f.close()
+
+        # print("LENGTHL", len(self.jpgfiles))
+
+        # exit()
 
         self.geometricTnf = geometric_transform
 
@@ -339,9 +344,10 @@ class HMDB51(data.Dataset):
             sample_duration = self.sample_duration
             startframe = 0
             future_idx = current_len
+            newLen = None
 
-            if fnum >= sample_duration:
-                diff = fnum - sample_duration
+            if fnum >= (sample_duration + frame_gap):
+                diff = fnum - (sample_duration + frame_gap)
                 startframe = random.randint(0, diff)
                 future_idx = startframe + current_len - 1
 
@@ -353,11 +359,14 @@ class HMDB51(data.Dataset):
                 newLen = int(fnum * 2.0 / 3.0)
                 diffnum = fnum - newLen
                 startframe = random.randint(0, diffnum)
-                frame_gap = float(newLen - 1) / float(sample_duration)
-                future_idx = int(startframe + current_len * frame_gap)
+                frame_gap = float(newLen - 1) / float(current_len)
+                future_idx = int(startframe + current_len * frame_gap) - 1
 
-                print("start frame", startframe)
-                print("FUTURE ID:", future_idx)
+                # print("Fnum:", fnum)
+                # print("Newlen:", newLen)
+                # print("start frame", startframe)
+                # print("FUTURE ID:", future_idx)
+                # print("folder_path:", folder_path)
 
             crop_offset_x = -1
             crop_offset_y = -1
@@ -369,54 +378,103 @@ class HMDB51(data.Dataset):
             
             video_indices = []
 
-            for i in range(sample_duration):
-                
-                nowid = int(startframe + i)
-                newid = nowid + 1
+            if not newLen:
+                for i in range(sample_duration):
+                    
+                    nowid = int(startframe + i)
+                    newid = nowid + 1
 
-                video_indices.append(newid)
-
-
-                newid = str(newid).zfill(5)
-                img_path = os.path.join(folder_path, "image_{}.jpg".format(newid))
-
-                img = load_image(img_path)  # CxHxW
-
-                ht, wd = img.size(1), img.size(2)
-
-                if ht <= wd:
-                    ratio  = float(wd) / float(ht)
-                    # width, height
-                    img = resize(img, int(self.imgSize * ratio), self.imgSize)
-                else:
-
-                    ratio  = float(ht) / float(wd)
-                    # width, height
-                    img = resize(img, self.imgSize, int(self.imgSize * ratio))
+                    video_indices.append(newid)
 
 
-                if crop_offset_x == -1:
-                    crop_offset_x = random.randint(0, img.size(2) - self.cropSize - 1)
-                    crop_offset_y = random.randint(0, img.size(1) - self.cropSize - 1)
+                    newid = str(newid).zfill(5)
+                    img_path = os.path.join(folder_path, "image_{}.jpg".format(newid))
+
+                    img = load_image(img_path)  # CxHxW
+
+                    ht, wd = img.size(1), img.size(2)
+
+                    if ht <= wd:
+                        ratio  = float(wd) / float(ht)
+                        # width, height
+                        img = resize(img, int(self.imgSize * ratio), self.imgSize)
+                    else:
+
+                        ratio  = float(ht) / float(wd)
+                        # width, height
+                        img = resize(img, self.imgSize, int(self.imgSize * ratio))
 
 
-                img = cropimg(img, crop_offset_x, crop_offset_y, self.cropSize)
-
-                assert(img.size(1) == self.cropSize)
-                assert(img.size(2) == self.cropSize)
-
-                # Flip
-
-                if toflip:
-                   img = torch.from_numpy(fliplr(img.numpy())).float()
-
-                mean=[0.485, 0.456, 0.406]
-                std=[0.229, 0.224, 0.225]
-                img = color_normalize(img, mean, std)
+                    if crop_offset_x == -1:
+                        crop_offset_x = random.randint(0, img.size(2) - self.cropSize - 1)
+                        crop_offset_y = random.randint(0, img.size(1) - self.cropSize - 1)
 
 
-                video[i] = img.clone()
-                
+                    img = cropimg(img, crop_offset_x, crop_offset_y, self.cropSize)
+
+                    assert(img.size(1) == self.cropSize)
+                    assert(img.size(2) == self.cropSize)
+
+                    # Flip
+
+                    if toflip:
+                       img = torch.from_numpy(fliplr(img.numpy())).float()
+
+                    mean=[0.485, 0.456, 0.406]
+                    std=[0.229, 0.224, 0.225]
+                    img = color_normalize(img, mean, std)
+
+
+                    video[i] = img.clone()
+                    
+            else:
+                for i in range(newLen):
+                    
+                    nowid = int(startframe + i)
+                    newid = nowid + 1
+
+                    video_indices.append(newid)
+
+
+                    newid = str(newid).zfill(5)
+                    img_path = os.path.join(folder_path, "image_{}.jpg".format(newid))
+
+                    img = load_image(img_path)  # CxHxW
+
+                    ht, wd = img.size(1), img.size(2)
+
+                    if ht <= wd:
+                        ratio  = float(wd) / float(ht)
+                        # width, height
+                        img = resize(img, int(self.imgSize * ratio), self.imgSize)
+                    else:
+
+                        ratio  = float(ht) / float(wd)
+                        # width, height
+                        img = resize(img, self.imgSize, int(self.imgSize * ratio))
+
+
+                    if crop_offset_x == -1:
+                        crop_offset_x = random.randint(0, img.size(2) - self.cropSize - 1)
+                        crop_offset_y = random.randint(0, img.size(1) - self.cropSize - 1)
+
+
+                    img = cropimg(img, crop_offset_x, crop_offset_y, self.cropSize)
+
+                    assert(img.size(1) == self.cropSize)
+                    assert(img.size(2) == self.cropSize)
+
+                    # Flip
+
+                    if toflip:
+                       img = torch.from_numpy(fliplr(img.numpy())).float()
+
+                    mean=[0.485, 0.456, 0.406]
+                    std=[0.229, 0.224, 0.225]
+                    img = color_normalize(img, mean, std)
+
+
+                    video[i] = img.clone()
 
 
             future_imgs_indices = []

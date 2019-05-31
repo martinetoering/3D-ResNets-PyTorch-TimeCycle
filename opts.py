@@ -252,18 +252,31 @@ def parse_opts():
         help='If true, training is not performed.')
     parser.set_defaults(no_train=False)
     parser.add_argument(
-        '--no_val',
+        '--test_eval_all',
         action='store_true',
-        help='If true, validation is not performed.')
-    parser.set_defaults(no_val=False)
+        help='If true, all epochs are tested and evaluated in validation step')
+    parser.set_defaults(test_eval_all=False)
     parser.add_argument(
-        '--no_test', action='store_true', help='If true, no test is performed.')
+        '--val',
+        action='store_true',
+        help='If true, validation step with n_val_samples is performed (no testing or evaluating)')
+    parser.set_defaults(val=False)
+    parser.add_argument(
+        '--no_test', action='store_true', help='If true, no test is performed')
     parser.set_defaults(no_test=False)
     parser.add_argument(
         '--test_subset',
         default='val',
         type=str,
         help='Used subset in test (val | test)')
+    parser.add_argument(
+        '--no_eval', action='store_true', help='If true, no evaluation is done.')
+    parser.set_defaults(no_eval=False)
+    parser.add_argument(
+        '--top_k', default=1, type=int, help='Top 1 or Top 5 accuracy')
+    parser.add_argument(
+        '--print_per_epoch', action='store_true')
+    parser.set_defaults(print_per_epoch=False)
     # parser.add_argument(
     #     '--scale_in_test',
     #     default=1.0,
@@ -327,11 +340,6 @@ def parse_opts():
     #     help='ResNeXt cardinality')
     # parser.add_argument(
     #     '--manual_seed', default=1, type=int, help='Manually set random seed')
-    parser.add_argument(
-        '--no_eval', action='store_true', help='If true, no evaluation is done.')
-    parser.add_argument(
-        '--top_k', default=1, type=int, help='Top 1 or Top 5 accuracy')
-
     args = parser.parse_args()
 
     return args

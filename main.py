@@ -32,7 +32,7 @@ from target_transforms import Compose as TargetCompose
 from dataset_utils import Logger
 from datasets.hmdb51 import HMDB51
 from train import train_epoch
-from validation import val_epoch
+from validation import val_epoch, val_test_eval_epoch
 import test
 import eval_hmdb51
 
@@ -92,7 +92,7 @@ if __name__ == '__main__':
     os.environ['CUDA_VISIBLE_DEVICES'] = opt.gpu_id
 
     print("Torch version:", torch.__version__)
-    print("Train, val, test, evaluate:", not opt.no_train, not opt.no_val, not opt.no_test, not opt.no_eval)
+    print("Train, val, test, evaluate:", not opt.no_train, opt.val, not opt.no_test, not opt.no_eval)
 
     if opt.root_path != '':
         opt.video_path = os.path.join(opt.root_path, opt.video_path)
@@ -101,7 +101,7 @@ if __name__ == '__main__':
         if split_list != split_annotation:
             print("Please provide list and annotation for same split")
             exit()
-        split = opt.annotation_path.split(".")[0]
+        split = (opt.annotation_path.split(".")[0]).split("/")[-1]
         print("Split of HMDB51:", split)
         opt.annotation_path = os.path.join(opt.root_path, opt.annotation_path)
         opt.list = os.path.join(opt.root_path, opt.list)
@@ -114,9 +114,16 @@ if __name__ == '__main__':
         if opt.pretrain_path:
             opt.pretrain_path = os.path.join(opt.root_path, opt.pretrain_path)
 
+    if opt.val and opt.test_eval_all:
+        print("Choose validation with test and eval, or other validation, not both")
+        exit()
+
     params, state = get_params(opt)
 
     print("Result path:", opt.result_path)
+    print("Resume path:", opt.resume_path)
+    print("Video path:", opt.video_path)
+    print("Annotation path:", opt.annotation_path) 
 
     # opt.scales = [opt.initial_scale]
     # for i in range(1, opt.n_scales):
@@ -216,15 +223,9 @@ if __name__ == '__main__':
         if not opt.no_train:
             optimizer.load_state_dict(checkpoint['optimizer'])
 
-        train_logger = Logger(
-           os.path.join(opt.result_path, 'train_resume_{}.log'.format(opt.begin_epoch)),
-           ['epoch', 'loss', 'loss_vc', 'loss_overall', 'loss_sim', 'theta_loss', 'theta_skip_loss', 'acc', 'lr'])
-        train_batch_logger = Logger(
-           os.path.join(opt.result_path, 'train_batch_resume_{}.log'.format(opt.begin_epoch)),
-           ['epoch', 'batch', 'iter', 'loss', 'loss_vc', 'loss_overall', 'loss_sim', 'theta_loss', 'theta_skip_loss', 'acc', 'lr'])
-
-        val_logger = Logger(
-            os.path.join(opt.result_path, 'val_resume_{}.log'.format(opt.begin_epoch)), ['epoch', 'loss', 'acc'])
+        train_log_file = 'train_resume_{}.log'.format(opt.begin_epoch)
+        train_batch_log_file = 'train_batch_resume_{}.log'.format(opt.begin_epoch)
+        val_log_file = 'val_resume_{}.log'.format(opt.begin_epoch)
 
         opts_file = os.path.join(opt.result_path, 'opts_resume_{}.json'.format(opt.begin_epoch))
         
@@ -232,14 +233,9 @@ if __name__ == '__main__':
 
     else:
 
-        train_logger = Logger(
-           os.path.join(opt.result_path, 'train.log'),
-           ['epoch', 'loss', 'loss_vc', 'loss_overall', 'loss_sim', 'theta_loss', 'theta_skip_loss', 'acc', 'lr'])
-        train_batch_logger = Logger(
-           os.path.join(opt.result_path, 'train_batch.log'),
-           ['epoch', 'batch', 'iter', 'loss', 'loss_vc', 'loss_overall', 'loss_sim', 'theta_loss', 'theta_skip_loss', 'acc', 'lr'])
-        val_logger = Logger(
-            os.path.join(opt.result_path, 'val.log'), ['epoch', 'loss', 'acc'])
+        train_log_file = 'train.log'
+        train_batch_log_file = 'train_batch.log'
+        val_log_file = 'val.log'
 
         opts_file = os.path.join(opt.result_path, 'opts.json')
 
@@ -247,10 +243,9 @@ if __name__ == '__main__':
     print("\n")
     print("Save opts at", opts_file)
 
-    with open(opts_file, 'w') as opt_file:
-        json.dump(vars(opt), opt_file)
-
-    
+    if not opt.no_train:
+        with open(opts_file, 'w') as opt_file:
+            json.dump(vars(opt), opt_file)
 
     if not opt.no_train:
 
@@ -258,6 +253,12 @@ if __name__ == '__main__':
         print("TRAINING")
         print("\n")
 
+        train_logger = Logger(
+           os.path.join(opt.result_path, train_log_file),
+           ['epoch', 'loss', 'loss_vc', 'loss_overall', 'loss_sim', 'theta_loss', 'theta_skip_loss', 'acc', 'lr'])
+        train_batch_logger = Logger(
+           os.path.join(opt.result_path, train_batch_log_file),
+           ['epoch', 'batch', 'iter', 'loss', 'loss_vc', 'loss_overall', 'loss_sim', 'theta_loss', 'theta_skip_loss', 'acc', 'lr'])
 
         # assert opt.train_crop in ['random', 'corner', 'center']
         # if opt.train_crop == 'random':
@@ -324,10 +325,13 @@ if __name__ == '__main__':
         print("\n")
 
 
-    if not opt.no_val:
+    if opt.val or opt.test_eval_all:
 
         print("VALIDATION")
         print("\n")
+
+        val_logger = Logger(
+            os.path.join(opt.result_path, val_log_file), ['epoch', 'loss', 'acc'])
 
         # spatial_transform = Compose([
         #     Scale(opt.sample_size),
@@ -338,13 +342,19 @@ if __name__ == '__main__':
         # temporal_transform = LoopPadding(opt.sample_duration)
         target_transform = ClassLabel()
 
+        if opt.val:
+            n = opt.n_val_samples
+
+        if opt.test_eval_all:
+            n = 0
+
         validation_data = HMDB51(
             params,
             opt.video_path,
             opt.annotation_path,
             'validation',
             sample_duration=opt.sample_duration,
-            n_samples_for_each_video=opt.n_val_samples,
+            n_samples_for_each_video=n,
             target_transform=target_transform)
 
 
@@ -358,6 +368,7 @@ if __name__ == '__main__':
             pin_memory=True)
 
         print("Validation loader done")
+
     
 
     #print("MODEL:", model.state_dict().keys())
@@ -374,11 +385,23 @@ if __name__ == '__main__':
 
             loss, acc, main_loss, losses_theta, losses_theta_skip = train_epoch(i, params, train_loader, model, criterion, optimizer, opt, train_logger, train_batch_logger)
 
-        if not opt.no_val:
+        if opt.test_eval_all:
+
+            if i > (0.1*opt.n_epochs) and i % opt.checkpoint == 0:
+                validation_loss, file_json = val_test_eval_epoch(i, params, val_loader, model, criterion, opt, val_logger, validation_data.class_names)
+                name = opt.result_path + '/' + "results" + '_all' + '.txt'
+                eval_hmdb51.eval_hmdb51(name, opt.annotation_path, file_json, "validation", opt.top_k, opt.test_eval_all, i)
+
+        if not opt.no_train and opt.test_eval_all:
+
+            if i > (0.1*opt.n_epochs) and i % opt.checkpoint == 0:
+                scheduler.step(validation_loss)
+
+        if opt.val:
 
             validation_loss = val_epoch(i, params, val_loader, model, criterion, opt, val_logger)
 
-        if not opt.no_train and not opt.no_val:
+        if not opt.no_train and opt.val:
 
             scheduler.step(validation_loss)
 
@@ -422,13 +445,16 @@ if __name__ == '__main__':
 
         print("EVALUATING")
 
-        name = opt.result_path + '/' + "results" + '_' + str(opt.n_epochs) + '.txt'
+        if not opt.no_train and not opt.no_val:
+            epoch = opt.n_epochs
+            name = opt.result_path + '/' + "results" + '_' + str(epoch) + '.txt'
+        else:
+            epoch = opt.begin_epoch
+            name = opt.result_path + '/' + "results" + '_' + str(epoch) + '.txt'
         
         print("File:", name)
 
         prediction = os.path.join(opt.result_path, "val.json")
         subset = "validation"
 
-        eval_hmdb51.eval_hmdb51(name, opt.annotation_path, prediction, subset, opt.top_k)
-
-
+        eval_hmdb51.eval_hmdb51(name, opt.annotation_path, prediction, subset, opt.top_k, opt.print_per_epoch, epoch)
