@@ -387,15 +387,16 @@ if __name__ == '__main__':
 
         if opt.test_eval_all:
 
-            if i > (0.1*opt.n_epochs) and i % opt.checkpoint == 0:
-                validation_loss, file_json = val_test_eval_epoch(i, params, val_loader, model, criterion, opt, val_logger, validation_data.class_names)
-                name = opt.result_path + '/' + "results" + '_all' + '.txt'
-                eval_hmdb51.eval_hmdb51(name, opt.annotation_path, file_json, "validation", opt.top_k, opt.test_eval_all, i)
+            # if i % opt.checkpoint == 0:
+            validation_loss, file_json = val_test_eval_epoch(i, params, val_loader, model, criterion, opt, val_logger, validation_data.class_names)
+            name_general = opt.result_path + '/' + "results" + '_all' + '.txt'
+            name = opt.result_path + '/' + "results_" + str(i) + '.txt'
+            eval_hmdb51.eval_hmdb51(name, opt.annotation_path, file_json, "validation", opt.top_k,  name_general, i)
 
         if not opt.no_train and opt.test_eval_all:
 
-            if i > (0.1*opt.n_epochs) and i % opt.checkpoint == 0:
-                scheduler.step(validation_loss)
+            # if i % opt.checkpoint == 0:
+            scheduler.step(validation_loss)
 
         if opt.val:
 
@@ -457,4 +458,4 @@ if __name__ == '__main__':
         prediction = os.path.join(opt.result_path, "val.json")
         subset = "validation"
 
-        eval_hmdb51.eval_hmdb51(name, opt.annotation_path, prediction, subset, opt.top_k, opt.print_per_epoch, epoch)
+        eval_hmdb51.eval_hmdb51(name, opt.annotation_path, prediction, subset, opt.top_k, None, epoch)
