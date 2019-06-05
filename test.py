@@ -30,7 +30,7 @@ def calculate_video_results(output_buffer, video_id, test_results, class_names):
     test_results['results'][video_id] = video_results
 
 
-def test(data_loader, model, opt, class_names):
+def test(data_loader, model, opt, class_names, val_json_name):
     print('test')
     print(torch.__version__)
     model.eval()
@@ -63,8 +63,8 @@ def test(data_loader, model, opt, class_names):
 
         if (i % 100) == 0:
             with open(
-                    os.path.join(opt.result_path, '{}.json'.format(
-                        opt.test_subset)), 'w') as f:
+                    os.path.join(opt.result_path, '{}_{}.json'.format(
+                        opt.test_subset, val_json_name)), 'w') as f:
                 MyEncoder().encode(f)
                 json.dump(test_results, f, cls=MyEncoder)
 
@@ -82,6 +82,6 @@ def test(data_loader, model, opt, class_names):
     print("Test results:", test_results)
 
     with open(
-            os.path.join(opt.result_path, '{}.json'.format(opt.test_subset)),
+            os.path.join(opt.result_path, '{}_{}.json'.format(opt.test_subset, val_json_name)),
             'w') as f:
         json.dump(test_results, f)

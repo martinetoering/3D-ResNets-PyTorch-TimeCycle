@@ -22,17 +22,12 @@ import models.videos.model_simple as models
 from opts import parse_opts
 from geotnf.transformation import GeometricTnf
 
-from mean import get_mean, get_std
-from spatial_transforms import (
-    Compose, Normalize, Scale, CenterCrop, CornerCrop, MultiScaleCornerCrop,
-    MultiScaleRandomCrop, RandomHorizontalFlip, ToTensor)
-from temporal_transforms import LoopPadding, TemporalRandomCrop
 from target_transforms import ClassLabel, VideoID
 from target_transforms import Compose as TargetCompose
 from dataset_utils import Logger
 from datasets.hmdb51 import HMDB51
 from train import train_epoch
-from validation import val_epoch, val_test_eval_epoch
+from validation import val_epoch
 import test
 import eval_hmdb51
 
@@ -239,11 +234,11 @@ if __name__ == '__main__':
 
         opts_file = os.path.join(opt.result_path, 'opts.json')
 
-    
-    print("\n")
-    print("Save opts at", opts_file)
+
 
     if not opt.no_train:
+        print("\n")
+        print("Save opts at", opts_file)
         with open(opts_file, 'w') as opt_file:
             json.dump(vars(opt), opt_file)
 
@@ -385,18 +380,18 @@ if __name__ == '__main__':
 
             loss, acc, main_loss, losses_theta, losses_theta_skip = train_epoch(i, params, train_loader, model, criterion, optimizer, opt, train_logger, train_batch_logger)
 
-        if opt.test_eval_all:
+        # if opt.test_eval_all:
 
-            # if i % opt.checkpoint == 0:
-            validation_loss, file_json = val_test_eval_epoch(i, params, val_loader, model, criterion, opt, val_logger, validation_data.class_names)
-            name_general = opt.result_path + '/' + "results" + '_all' + '.txt'
-            name = opt.result_path + '/' + "results_" + str(i) + '.txt'
-            eval_hmdb51.eval_hmdb51(name, opt.annotation_path, file_json, "validation", opt.top_k,  name_general, i)
+        #     # if i % opt.checkpoint == 0:
+        #     validation_loss, file_json = val_test_eval_epoch(i, params, val_loader, model, criterion, opt, val_logger, validation_data.class_names)
+        #     name_general = opt.result_path + '/' + "results" + '_all' + '.txt'
+        #     name = opt.result_path + '/' + "results_" + str(i) + '.txt'
+        #     eval_hmdb51.eval_hmdb51(name, opt.annotation_path, file_json, "validation", opt.top_k,  name_general, i)
 
-        if not opt.no_train and opt.test_eval_all:
+        # if not opt.no_train and opt.test_eval_all:
 
-            # if i % opt.checkpoint == 0:
-            scheduler.step(validation_loss)
+        #     # if i % opt.checkpoint == 0:
+        #     scheduler.step(validation_loss)
 
         if opt.val:
 
@@ -410,7 +405,6 @@ if __name__ == '__main__':
     if not opt.no_test:
 
         print("\n")
-
         print("TESTING")
 
         # spatial_transform = Compose([
@@ -438,24 +432,39 @@ if __name__ == '__main__':
             num_workers=opt.n_threads,
             pin_memory=True)
         
-        test.test(test_loader, model, opt, test_data.class_names)
+        if opt.name_general_eval_file:
+            val_json_name = 'temp'
+        else:
+            if not opt.no_train and opt.val:
+                epoch = opt.n_epochs
+            else:
+                epoch = opt.begin_epoch
+            val_json_name = str(epoch)
+
+        test.test(test_loader, model, opt, test_data.class_names, val_json_name)
 
     if not opt.no_eval:
 
         print("\n")
-
         print("EVALUATING")
 
-        if not opt.no_train and not opt.no_val:
+        if not opt.no_train and opt.val:
             epoch = opt.n_epochs
-            name = opt.result_path + '/' + "results" + '_' + str(epoch) + '.txt'
+
         else:
             epoch = opt.begin_epoch
-            name = opt.result_path + '/' + "results" + '_' + str(epoch) + '.txt'
+            
+        eval_path = opt.result_path + '/' + "results" + '_' + str(epoch) + '.txt'
         
-        print("File:", name)
+        print("File:", eval_path)
 
-        prediction = os.path.join(opt.result_path, "val.json")
+        prediction_file = os.path.join(opt.result_path, 'val_{}.json'.format(val_json_name))
+        general_output_path = os.path.join(opt.result_path, 'results_all.txt')
         subset = "validation"
 
-        eval_hmdb51.eval_hmdb51(name, opt.annotation_path, prediction, subset, opt.top_k, None, epoch)
+        if opt.name_general_eval_file:
+            with open(general_output_path, 'w') as f:
+                f.write("Results \n")
+                f.write("Epoch \t Accuracy \t Error \n")
+
+        eval_hmdb51.eval_hmdb51(eval_path, opt.annotation_path, prediction_file, subset, opt.top_k, general_output_path, epoch)

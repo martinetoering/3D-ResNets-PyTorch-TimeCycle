@@ -19,7 +19,7 @@ def parse_opts():
 
     parser.add_argument(
         '--root_path',
-        default='/home/mtoering/data',
+        default='/home/martine/data',
         type=str,
         help='Root directory path of data')
     parser.add_argument(
@@ -340,6 +340,9 @@ def parse_opts():
     #     help='ResNeXt cardinality')
     # parser.add_argument(
     #     '--manual_seed', default=1, type=int, help='Manually set random seed')
+    parser.add_argument(
+        '--name_general_eval_file',
+        action='store_true')
     args = parser.parse_args()
 
     return args

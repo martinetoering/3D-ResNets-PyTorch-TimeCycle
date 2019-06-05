@@ -5,15 +5,21 @@ import sys
 import numpy as np
 import pandas as pd
 
-def eval_hmdb51(name, annotation_path, prediction_path, test_subset, top_k, name_general, epoch):
-    hmdb_classification = HMDBclassification(name, annotation_path, prediction_path, subset=test_subset, top_k=top_k)
+def eval_hmdb51(epoch_output_path, annotation_path, prediction_path, test_subset, top_k, general_output_path, epoch):
+    hmdb_classification = HMDBclassification(epoch_output_path, annotation_path, prediction_path, subset=test_subset, top_k=top_k)
+    hmdb_classification.evaluate(epoch_output_path)
 
-    hmdb_classification.evaluate(name, print_per_epoch)
+    accuracy = hmdb_classification.hit_at_k
+    error = hmdb_classification.error 
 
-    if name_general:
-        f = open(name_general, "a")
-        f.write(str(epoch) + '          ' + str(hmdb_classification.hit_at_k) + '\n') 
+    if general_output_path:
+        f = open(general_output_path, 'a')
+        f.write(str(epoch) + "\t" + str(accuracy) + "\t" + str(error) + "\n") 
         f.close()
+    
+    f = open(epoch_output_path, 'a')
+    f.write("Acc: " + str(hmdb_classification.hit_at_k))
+    f.close()
 
 class HMDBclassification(object):
 
@@ -115,19 +121,20 @@ class HMDBclassification(object):
                                    'score': score_lst})
         return prediction
 
-    def evaluate(self, name, print_per_epoch):
+    def evaluate(self, name):
         """Evaluates a prediction file. For the detection task we measure the
         interpolated mean average precision to measure the performance of a
         method.
         """
         hit_at_k = compute_video_hit_at_k(self.ground_truth,
                                           self.prediction, top_k=self.top_k)
-        with open(name, 'w') as f:
+        with open(name, 'a') as f:
             f.write('[RESULTS] Performance on ActivityNet untrimmed video '
                'classification task.\n')
             f.write('\tError@{}: {}\n'.format(self.top_k, 1.0 - hit_at_k))
             #print '\tAvg Hit@{}: {}'.format(self.top_k, avg_hit_at_k)
         self.hit_at_k = hit_at_k
+        self.error = 1.0 - hit_at_k
 
 ################################################################################
 # Metrics
@@ -171,10 +178,10 @@ def compute_video_hit_at_k(ground_truth, prediction, top_k=3):
 
 
 if __name__ == '__main__':
-    name = sys.argv[1]
+    epoch_output_path = sys.argv[1]
     ground_truth_path = sys.argv[2]
     prediction_path = sys.argv[3]
     test_subset = sys.argv[4]
-    name_general = sys.argv[5]
+    general_output_path = sys.argv[5]
     epoch = sys.argv[6]
-    eval_hmdb51(name, ground_truth_path, prediction_path, test_subset=test_subset, top_k=1, name_general=name_general, epoch=epoch)
+    eval_hmdb51(epoch_output_path, ground_truth_path, prediction_path, test_subset=test_subset, top_k=1, general_output_path=general_output_path, epoch=epoch)
