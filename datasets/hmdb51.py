@@ -632,7 +632,7 @@ class HMDB51(data.Dataset):
 
             # print("META:", meta, "Frame indices:", frame_indices)
 
-            return video, imgs_target, patch_target.data, theta, meta, target
+            return video, imgs_target, patch_target.data, theta, meta, target, 0, 1
 
         else:
 

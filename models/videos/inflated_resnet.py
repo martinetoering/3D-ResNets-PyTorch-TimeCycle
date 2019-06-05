@@ -10,7 +10,8 @@ class InflatedResNet(torch.nn.Module):
                  resnet2d, 
                  sample_duration=13,
                  class_nb=1000, 
-                 conv_class=True):
+                 conv_class=True,
+                 bin_class=True):
         """
         Args:
             conv_class: Whether to use convolutional layer as classifier to
@@ -41,6 +42,13 @@ class InflatedResNet(torch.nn.Module):
                 kernel_size=(1, 1, 1),
                 bias=True)
 
+        if bin_class:
+            self.bin_classifier = torch.nn.Conv3d(
+                in_channels=2048,
+                out_channels=2,
+                kernel_size=(1, 1, 1),
+                bias=True)
+
         else:
             final_time_dim = 1
             self.avgpool = inflate.inflate_pool(
@@ -66,6 +74,7 @@ class InflatedResNet(torch.nn.Module):
         else:
 
             x_1 = x
+            x_2 = x
 
             x_1 = self.maxpool1(x_1)
 
@@ -82,7 +91,23 @@ class InflatedResNet(torch.nn.Module):
                 x_reshape = x_1.view(x_1.size(0), -1)
                 x_1 = self.fc(x_reshape)
 
-            return x, x_1
+
+            x_2 = self.maxpool1(x_2)
+
+            x_2 = self.layer4(x_2)
+
+            if self.conv_class:
+                x_2 = self.avgpool(x_2)
+                x_2 = self.bin_classifier(x_2)
+                x_2 = x_2.squeeze(3)
+                x_2 = x_2.squeeze(3)
+                x_2 = x_2.mean(2)
+            else:
+                x_2 = self.avgpool(x_2)
+                x_2reshape = x_2.view(x_2.size(0), -1)
+                x_2 = self.fc(x_2reshape)
+
+            return x, x_1, x_2
 
 
 def inflate_reslayer(reslayer2d):

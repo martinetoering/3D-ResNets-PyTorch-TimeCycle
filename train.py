@@ -48,7 +48,7 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
 
     end_time = time.time()
     
-    for i, (video, img, patch2, theta, meta, targets) in enumerate(data_loader):
+    for i, (video, img, patch2, theta, meta, targets, targets_forward, targets_backward) in enumerate(data_loader):
         
         # Measure data loading time
         data_time.update(time.time() - end_time)
@@ -71,10 +71,25 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
         
         targets = Variable(targets)
 
-        outputs_vc, outputs = model(video, patch2, img, theta)
+        outputs_vc, outputs_bin_forward, outputs_bin_backward, outputs = model(video, patch2, img, theta)
+
+        # Classification
 
         loss_vc = criterion(outputs_vc, targets)
         acc_vc = calculate_accuracy(outputs_vc, targets)
+
+        # New 
+
+        loss_bin_forward = criterion(outputs_bin_forward, targets_forward)
+        loss_bin_backward = criterion(outputs_bin_backward, targets_backward)
+        acc_forward = calculate_accuracy(outputs_bin_forward, targets_forward)
+        acc_backward = calculate_accuracy(outputs_bin_backward, targets_backward)
+
+        loss_bin = loss_bin_forward + loss_bin_backward
+        acc_bin = acc_forward + acc_backward
+
+        losses_bin.update(loss_bin[0].data, video.size(0))
+        accs_bin.update(acc_bin, video.size(0))
 
         # TimeCycle
 
@@ -95,13 +110,13 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
 
         losses_vc.update(loss_vc.data[0], video.size(0))
 
+        accuracies.update(acc_vc, video.size(0))
+
         # Combine losses
 
-        loss_combined = (opt.loss_weight*loss) + loss_vc
+        loss_combined = (opt.loss_weight*loss) + loss_vc + losses_bin
 
         losses_combined.update(loss_combined[0].data, video.size(0))
-
-        accuracies.update(acc_vc, video.size(0))
        
         optimizer.zero_grad()        
         

@@ -206,6 +206,8 @@ class CycleTime(nn.Module):
         # Patch feature
 
         x_class = None
+        x_bin_1 = None
+        x_bin_2 = None
 
         # print("\n")
         # print("FORWARD BASE")
@@ -215,12 +217,16 @@ class CycleTime(nn.Module):
 
         if x.size()[2] == self.sample_duration:
             
-            x_pre, x_class = self.module(x)
+            x_pre, x_class, x_bin_1 = self.module(x)
 
             startframe = 0
             futureid = startframe + self.videoLen * self.frame_gap
 
             x_pre = x_pre[:, :, startframe:futureid:self.frame_gap, :, :]
+
+            print(range(12, 0))
+            exit()
+            x_bin_2 = torch.index_select(x_bin_1, 2, range(12, 0))
             # print("XPRE SIZE:", x_pre.size())
 
         else:
@@ -238,7 +244,7 @@ class CycleTime(nn.Module):
 
         x_norm = F.normalize(x, p=2, dim=1)
 
-        return x, x_pre, x_norm, x_class
+        return x, x_pre, x_norm, x_class, x_bin
 
     def compute_transform_img_to_patch(self, query, base, temporal_out=1, detach_corrfeat=False):
 
@@ -272,7 +278,7 @@ class CycleTime(nn.Module):
 
         # Base features
         
-        r50_feat1, r50_feat1_pre, r50_feat1_norm, r50_class = self.forward_base(
+        r50_feat1, r50_feat1_pre, r50_feat1_norm, r50_class, r50_bin = self.forward_base(
                                                    videoclip1)
 
         # target patch feature

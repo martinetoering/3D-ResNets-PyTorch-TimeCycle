@@ -438,7 +438,7 @@ if __name__ == '__main__':
             if not opt.no_train and opt.val:
                 epoch = opt.n_epochs
             else:
-                epoch = opt.begin_epoch
+                epoch = opt.begin_epoch - 1
             val_json_name = str(epoch)
 
         test.test(test_loader, model, opt, test_data.class_names, val_json_name)
@@ -452,7 +452,7 @@ if __name__ == '__main__':
             epoch = opt.n_epochs
 
         else:
-            epoch = opt.begin_epoch
+            epoch = opt.begin_epoch - 1
             
         eval_path = opt.result_path + '/' + "results" + '_' + str(epoch) + '.txt'
         
