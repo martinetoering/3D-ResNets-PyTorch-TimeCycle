@@ -1,8 +1,10 @@
 import math
 import torch
 from torch.nn import ReplicationPad3d
+from torch.autograd import Variable
 import torch.nn as nn
 from . import inflate
+import numpy as np
 
 
 class InflatedResNet(torch.nn.Module):
@@ -74,40 +76,63 @@ class InflatedResNet(torch.nn.Module):
         else:
 
             x_1 = x
-            x_2 = x
 
             x_1 = self.maxpool1(x_1)
 
             x_1 = self.layer4(x_1)
 
             if self.conv_class:
+
                 x_1 = self.avgpool(x_1)
+
+                batch = x_1.size(0)
+                batch_half = int(batch / 2)
+
+                x_2 = x_1[0:batch_half, :, :, :, :]
+                # print("x_2", x_2.size())
+
+                x_3 = x_1[batch_half:batch, :, :, :, :]
+                # print("x_3", x_3.size())
+
+                indices = Variable(torch.from_numpy(np.array([12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0])).long().cuda())
+        
+                x_3 = torch.index_select(x_3, 2, indices)
+                # print("x_3 now", x_3.size())
+
+                x_2 = self.bin_classifier(x_2)
+
+                x_3 = self.bin_classifier(x_3)
+
                 x_1 = self.classifier(x_1)
+                
                 x_1 = x_1.squeeze(3)
                 x_1 = x_1.squeeze(3)
                 x_1 = x_1.mean(2)
+
+                x_2 = x_2.squeeze(3)
+                x_2 = x_2.squeeze(3)
+                x_2 = x_2.mean(2)
+
+                x_3 = x_3.squeeze(3)
+                x_3 = x_3.squeeze(3)
+                x_3 = x_3.mean(2)
+
             else:
                 x_1 = self.avgpool(x_1)
                 x_reshape = x_1.view(x_1.size(0), -1)
                 x_1 = self.fc(x_reshape)
 
-
-            x_2 = self.maxpool1(x_2)
-
-            x_2 = self.layer4(x_2)
-
-            if self.conv_class:
-                x_2 = self.avgpool(x_2)
-                x_2 = self.bin_classifier(x_2)
-                x_2 = x_2.squeeze(3)
-                x_2 = x_2.squeeze(3)
-                x_2 = x_2.mean(2)
-            else:
                 x_2 = self.avgpool(x_2)
                 x_2reshape = x_2.view(x_2.size(0), -1)
                 x_2 = self.fc(x_2reshape)
 
-            return x, x_1, x_2
+                x_3 = self.avgpool(x_3)
+                x_3reshape = x_3.view(x_3.size(0), -1)
+                x_3 = self.fc(x_3reshape)
+
+            x_bin = torch.cat((x_2, x_3), 0)
+
+            return x, x_1, x_bin
 
 
 def inflate_reslayer(reslayer2d):

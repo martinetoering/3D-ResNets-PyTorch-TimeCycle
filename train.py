@@ -22,8 +22,8 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
     batch_time = AverageMeter()
     data_time = AverageMeter()
   
-
     # TimeCycle
+
     main_loss = AverageMeter() # The feature similarity
     losses_theta = AverageMeter()
     losses_theta_skip = AverageMeter() 
@@ -37,27 +37,33 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
         loss_targ_theta_skip=None
     )
     
+    # Binary classification
 
-    # Classification
+    losses_bin = AverageMeter()
+    accs_bin = AverageMeter()
+
+    # HMDB Classification
+
     losses_vc = AverageMeter()
     accuracies = AverageMeter()
 
     # Combined
+
     losses_combined = AverageMeter()
 
 
     end_time = time.time()
     
-    for i, (video, img, patch2, theta, meta, targets, targets_forward, targets_backward) in enumerate(data_loader):
-        
+    for i, (video, img, patch2, theta, meta, targets, targets_bin) in enumerate(data_loader):
+
         # Measure data loading time
+
         data_time.update(time.time() - end_time)
 
         if video.size(0) < params['batch_size']:
             break
 
         video = Variable(video.cuda())
-        # imgs = Variable(imgs.cuda())
         img = Variable(img.cuda())
         patch2 = Variable(patch2.cuda())
         theta = Variable(theta.cuda())
@@ -68,27 +74,26 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
 
         if not opt.no_cuda:
             targets = targets.cuda(async=True)
+            targets_bin = targets_bin.cuda(async=True)
         
         targets = Variable(targets)
+        targets_bin = Variable(targets_bin)
 
-        outputs_vc, outputs_bin_forward, outputs_bin_backward, outputs = model(video, patch2, img, theta)
+        outputs_bin, outputs_vc, outputs = model(video, patch2, img, theta)
 
-        # Classification
+        # HMDB video classification
 
         loss_vc = criterion(outputs_vc, targets)
         acc_vc = calculate_accuracy(outputs_vc, targets)
 
-        # New 
+        losses_vc.update(loss_vc.data[0], video.size(0))
+        accuracies.update(acc_vc, video.size(0))
 
-        loss_bin_forward = criterion(outputs_bin_forward, targets_forward)
-        loss_bin_backward = criterion(outputs_bin_backward, targets_backward)
-        acc_forward = calculate_accuracy(outputs_bin_forward, targets_forward)
-        acc_backward = calculate_accuracy(outputs_bin_backward, targets_backward)
+        # Binary classification 
 
-        loss_bin = loss_bin_forward + loss_bin_backward
-        acc_bin = acc_forward + acc_backward
+        loss_bin = criterion(outputs_bin, targets_bin)
+        acc_bin = calculate_accuracy(outputs_bin, targets_bin)
 
-        losses_bin.update(loss_bin[0].data, video.size(0))
         accs_bin.update(acc_bin, video.size(0))
 
         # TimeCycle
@@ -104,17 +109,17 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
         losses_theta.update(sum(loss_targ_theta).data / len(loss_targ_theta), video.size(0))
         losses_theta_skip.update(sum(loss_targ_theta_skip).data / len(loss_targ_theta_skip), video.size(0))
 
+        # Apply weights
+
+        loss = opt.timecycle_weight*loss
         losses_overall.update(loss[0].data, video.size(0))
-        
-        # Classification
 
-        losses_vc.update(loss_vc.data[0], video.size(0))
-
-        accuracies.update(acc_vc, video.size(0))
+        loss_bin = opt.binary_class_weight*loss_bin
+        losses_bin.update(loss_bin.data[0], video.size(0))
 
         # Combine losses
 
-        loss_combined = (opt.loss_weight*loss) + loss_vc + losses_bin
+        loss_combined = loss + loss_vc + loss_bin
 
         losses_combined.update(loss_combined[0].data, video.size(0))
        
@@ -133,68 +138,57 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
         batch_time.update(time.time() - end_time)
         end_time = time.time()
 
-        # print("Loss:", type(losses_combined.val),  "Loss_vc:", type(losses_vc.val), "Loss_main", type(main_loss.val))
-
         batch_logger.log({
             'epoch': epoch,
             'batch': i + 1,
             'iter': (epoch - 1) * len(data_loader) + (i + 1),
             'loss': (losses_combined.val)[0],
-            'loss_vc': losses_vc.val,
-            'loss_overall': (losses_overall.val)[0],
+            'loss_hmdb_class': losses_vc.val,
+            'loss_timecycle': (losses_overall.val)[0],
+            'loss_bin_class': losses_bin.val,
+            'acc': accuracies.val,
+            'acc_bin': accs_bin.val,
+            'lr': get_lr(optimizer),
             'loss_sim': (main_loss.val)[0],
             'theta_loss': (losses_theta.val)[0],
-            'theta_skip_loss': (losses_theta_skip.val)[0],
-            'acc': accuracies.val,
-            'lr': get_lr(optimizer)
+            'theta_skip_loss': (losses_theta_skip.val)[0]
         })
 
         
-        print('Epoch: [{0}][{1}/{2}]\t'
-              'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-              'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
+        print('Epoch: [{0}][{1}/{2}] '
+              'Time {batch_time.val:.2f} ({batch_time.avg:.2f}) '
+              'Data {data_time.val:.2f} ({data_time.avg:.2f})\t'
               'Loss {losses_combined.val[0]:.3f} ({losses_combined.avg[0]:.3f})\t'
-              'Acc {acc.val:.3f} ({acc.avg:.3f})\t'.format(
+              'L_hmdb {losses_vc.val:.3f} ({losses_vc.avg:.3f})\t'
+              'L_time {losses_overall.val[0]:.3f} ({losses_overall.avg[0]:.3f})\t'
+              'L_bin {losses_bin.val:.3f} ({losses_bin.avg:.3f})\t'
+              'Acc {acc.val:.3f} ({acc.avg:.3f})\t'
+              'Acc_bin {accs_bin.val:.3f} ({accs_bin.avg:.3f})'.format(
                   epoch,
                   i + 1,
                   len(data_loader),
                   batch_time=batch_time,
                   data_time=data_time,
                   losses_combined=losses_combined,
-                  acc=accuracies))
+                  losses_vc=losses_vc,
+                  losses_bin=losses_bin,
+                  losses_overall=losses_overall,
+                  acc=accuracies,
+                  accs_bin=accs_bin))
 
-        # print("Epoch:", epoch, "[", i+1, "/", len(data_loader), "]")
-        # print('Epoch: [{0}][{1}/{2}]\t'
-        #       'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-        #       'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
-        #       'Loss {losses_combined.val:.4f} ({losses_combined.avg:.4f})\t'
-        #       'Loss_vc {losses_vc.val:.4f} ({losses_vc.avg:.4f})\t'
-        #       'Loss_main {main_loss.val:.4f} ({main_loss.avg:.4f})\t'
-        #       'Loss_theta {losses_theta.val:.4f} ({losses_theta.avg:.4f})\t'
-        #       'Loss_theta_skip {losses_theta_skip.val:.4f} ({losses_theta_skip.avg:.4f})\t'
-        #       'Acc {acc.val:.3f} ({acc.avg:.3f})'.format(
-        #           epoch,
-        #           i + 1,
-        #           len(data_loader),
-        #           batch_time=batch_time,
-        #           data_time=data_time,
-        #           loss=losses_combined,
-        #           loss_vc=losses_vc,
-        #           loss_main=main_loss,
-        #           loss_theta=losses_theta,
-        #           loss_theta_skip=losses_theta_skip,
-        #           acc=accuracies))
 
     epoch_logger.log({
         'epoch': epoch,
         'loss': (losses_combined.avg)[0],
-        'loss_vc': losses_vc.avg,
-        'loss_overall': (losses_overall.avg)[0],
+        'loss_hmdb_class': losses_vc.avg,
+        'loss_timecycle': (losses_overall.avg)[0],
+        'loss_bin_class': losses_bin.avg,
+        'acc': accuracies.avg,
+        'acc_bin': accs_bin.avg,
+        'lr': get_lr(optimizer),
         'loss_sim': (main_loss.avg)[0],
         'theta_loss': (losses_theta.avg)[0],
-        'theta_skip_loss': (losses_theta_skip.avg)[0],
-        'acc': accuracies.avg,
-        'lr': get_lr(optimizer)
+        'theta_skip_loss': (losses_theta_skip.avg)[0]
     })
 
     if epoch % opt.checkpoint == 0:
@@ -208,4 +202,3 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
         }
         torch.save(states, save_file_path)
 
-    return losses_vc.avg, accuracies, main_loss.avg, losses_theta.avg, losses_theta_skip.avg

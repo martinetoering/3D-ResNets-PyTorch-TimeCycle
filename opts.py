@@ -12,14 +12,20 @@ def parse_opts():
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        '--loss_weight',
-        default=75,
+        '--timecycle_weight',
+        default=50,
         type=int,
-        help='Weight to multiply TimeCycle loss with before adding to classification loss')
+        help='Weight to multiply TimeCycle loss with before adding to hmdb classification loss')
+
+    parser.add_argument(
+        '--binary_class_weight',
+        default=4,
+        type=int,
+        help='Weight to multiply binary classification loss with before adding to hmdb classification loss')
 
     parser.add_argument(
         '--root_path',
-        default='/home/mtoering/data',
+        default='/home/martine/data',
         type=str,
         help='Root directory path of data')
     parser.add_argument(
@@ -196,56 +202,6 @@ def parse_opts():
         help=
         'Number of classes for fine-tuning. n_classes is set to the number when pretraining.'
     )
-    # parser.add_argument(
-    #     '--initial_scale',
-    #     default=1.0,
-    #     type=float,
-    #     help='Initial scale for multiscale cropping')
-    # parser.add_argument(
-    #     '--n_scales',
-    #     default=5,
-    #     type=int,
-    #     help='Number of scales for multiscale cropping')
-    # parser.add_argument(
-    #     '--scale_step',
-    #     default=0.84089641525,
-    #     type=float,
-    #     help='Scale step for multiscale cropping')
-    # parser.add_argument(
-    #     '--train_crop',
-    #     default='corner',
-    #     type=str,
-    #     help=
-    #     'Spatial cropping method in training. random is uniform. corner is selection from 4 corners and 1 center.  (random | corner | center)'
-    # )
-    # parser.add_argument('--momentum', default=0.9, type=float, help='Momentum')
-    # parser.add_argument(
-    #     '--dampening', 
-    #     default=0.9, 
-    #     type=float, 
-    #     help='dampening of SGD')
-    # parser.add_argument(
-    #     '--weight_decay', default=1e-3, type=float, help='Weight Decay')
-    # parser.add_argument(
-    #     '--mean_dataset',
-    #     default='activitynet',
-    #     type=str,
-    #     help=
-    #     'dataset for mean values of mean subtraction (activitynet | kinetics)')
-    # parser.add_argument(
-    #     '--mean_norm',
-    #     action='store_true',
-    #     help='If true, inputs are normalized by mean.')
-    # parser.set_defaults(mean_norm=False)
-    # parser.add_argument(
-    #     '--std_norm',
-    #     action='store_true',
-    #     help='If true, inputs are normalized by standard deviation.')
-    # parser.set_defaults(std_norm=False)
-    # parser.add_argument(
-    #     '--nesterov', action='store_true', help='Nesterov momentum')
-    # parser.set_defaults(nesterov=False)
-
     parser.add_argument(
         '--no_train',
         action='store_true',
@@ -277,16 +233,7 @@ def parse_opts():
     parser.add_argument(
         '--print_per_epoch', action='store_true')
     parser.set_defaults(print_per_epoch=False)
-    # parser.add_argument(
-    #     '--scale_in_test',
-    #     default=1.0,
-    #     type=float,
-    #     help='Spatial scale in test')
-    # parser.add_argument(
-    #     '--crop_position_in_test',
-    #     default='c',
-    #     type=str,
-    #     help='Cropping method (c | tl | tr | bl | br) in test')
+
     parser.add_argument(
         '--no_softmax_in_test',
         action='store_true',
@@ -305,17 +252,7 @@ def parse_opts():
         default=2,
         type=int,
         help='Trained model is saved at every this epochs.')
-    # parser.add_argument(
-    #     '--no_hflip',
-    #     action='store_true',
-    #     help='If true holizontal flipping is not performed.')
-    # parser.set_defaults(no_hflip=False)
-    # parser.add_argument(
-    #     '--norm_value',
-    #     default=1,
-    #     type=int,
-    #     help=
-    #     'If 1, range of inputs is [0-255]. If 255, range of inputs is [0-1].')
+
     parser.add_argument(
         '--model',
         default='resnet',

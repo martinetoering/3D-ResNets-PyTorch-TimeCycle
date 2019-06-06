@@ -79,8 +79,6 @@ def get_params(opt):
 
 if __name__ == '__main__':
 
-    global best_loss
-
     opt = parse_opts()
 
     print("Gpu ID's:", opt.gpu_id)
@@ -120,15 +118,8 @@ if __name__ == '__main__':
     print("Video path:", opt.video_path)
     print("Annotation path:", opt.annotation_path) 
 
-    # opt.scales = [opt.initial_scale]
-    # for i in range(1, opt.n_scales):
-    #     opt.scales.append(opt.scales[-1] * opt.scale_step)
     opt.arch = '{}-{}'.format(opt.model, opt.model_depth)
-    # opt.mean = get_mean(opt.norm_value, dataset=opt.mean_dataset)
-    # opt.std = get_std(opt.norm_value)
     print("Architecture:", opt.arch)
-    # print("Opt.mean", opt.mean)
-    # print("opt.std", opt.std)
 
     # Random seed
     if opt.manualSeed is None:
@@ -138,8 +129,6 @@ if __name__ == '__main__':
     if not opt.no_cuda:
         torch.cuda.manual_seed_all(opt.manualSeed)
 
-    best_loss = 0  # best test accuracy
-
     print("\n")
 
     print("Sample Size:", opt.sample_size)
@@ -147,7 +136,8 @@ if __name__ == '__main__':
     print("Frame Gap:", opt.frame_gap)
     print("Pred Distance:", opt.predDistance)
     print("Sample Duration:", opt.sample_duration)
-    print("Loss weight:", opt.loss_weight)
+    print("TimeCycle weight:", opt.timecycle_weight)
+    print("Binary classification weight:", opt.binary_class_weight)
 
     model = models.CycleTime(class_num=params['n_classes'], 
                              trans_param_num=3, 
@@ -169,16 +159,6 @@ if __name__ == '__main__':
     criterion = nn.CrossEntropyLoss()
     if not opt.no_cuda:
         criterion = criterion.cuda()
-
-    # if not opt.mean_norm and not opt.std_norm:
-    #     norm_method = Normalize([0, 0, 0], [1, 1, 1])
-    #     print("Norm method 0")
-    # elif not opt.std_norm:
-    #     norm_method = Normalize(opt.mean, [1, 1, 1])
-    #     print("Norm method 1")
-    # else:
-    #     norm_method = Normalize(opt.mean, opt.std)
-    #     print("Norm method 2")
 
     print('Weight_decay: ' + str(opt.weight_decay))
     print('Beta1: ' + str(opt.momentum))
@@ -234,15 +214,17 @@ if __name__ == '__main__':
 
         opts_file = os.path.join(opt.result_path, 'opts.json')
 
-
+      
 
     if not opt.no_train:
+
+        # Save opts
+
         print("\n")
         print("Save opts at", opts_file)
         with open(opts_file, 'w') as opt_file:
             json.dump(vars(opt), opt_file)
 
-    if not opt.no_train:
 
         print("\n")
         print("TRAINING")
@@ -250,27 +232,10 @@ if __name__ == '__main__':
 
         train_logger = Logger(
            os.path.join(opt.result_path, train_log_file),
-           ['epoch', 'loss', 'loss_vc', 'loss_overall', 'loss_sim', 'theta_loss', 'theta_skip_loss', 'acc', 'lr'])
+           ['epoch', 'loss', 'loss_hmdb_class', 'loss_timecycle', 'loss_bin_class', 'acc', 'acc_bin', 'lr', 'loss_sim', 'theta_loss', 'theta_skip_loss'])
         train_batch_logger = Logger(
            os.path.join(opt.result_path, train_batch_log_file),
-           ['epoch', 'batch', 'iter', 'loss', 'loss_vc', 'loss_overall', 'loss_sim', 'theta_loss', 'theta_skip_loss', 'acc', 'lr'])
-
-        # assert opt.train_crop in ['random', 'corner', 'center']
-        # if opt.train_crop == 'random':
-        #     crop_method = MultiScaleRandomCrop(opt.scales, opt.sample_size)
-        # elif opt.train_crop == 'corner':
-        #     crop_method = MultiScaleCornerCrop(opt.scales, opt.sample_size)
-        # elif opt.train_crop == 'center':
-        #     crop_method = MultiScaleCornerCrop(
-        #         opt.scales, opt.sample_size, crop_positions=['c'])
-
-        # spatial_transform = Compose([
-        #     crop_method,
-        #     RandomHorizontalFlip(),
-        #     ToTensor(opt.norm_value), norm_method
-        # ])
-
-        # temporal_transform = TemporalRandomCrop(opt.sample_duration)
+           ['epoch', 'batch', 'iter', 'loss_hmdb_class', 'loss_timecycle', 'loss_bin_class', 'acc', 'acc_bin', 'lr', 'loss_sim', 'theta_loss', 'theta_skip_loss'])
         
         target_transform = ClassLabel()
 
@@ -300,12 +265,6 @@ if __name__ == '__main__':
            pin_memory=True)
 
         print("Train loader made")
-
-        # if opt.nesterov:
-        #     dampening = 0
-        # else:
-        #     dampening = opt.dampening
-
         print("Learning rate:", opt.learning_rate)
         print("Momentum:", opt.momentum)
         print("Weight decay:", opt.weight_decay)
@@ -328,13 +287,6 @@ if __name__ == '__main__':
         val_logger = Logger(
             os.path.join(opt.result_path, val_log_file), ['epoch', 'loss', 'acc'])
 
-        # spatial_transform = Compose([
-        #     Scale(opt.sample_size),
-        #     CenterCrop(opt.sample_size),
-        #     ToTensor(opt.norm_value), norm_method
-        # ])
-
-        # temporal_transform = LoopPadding(opt.sample_duration)
         target_transform = ClassLabel()
 
         if opt.val:
@@ -349,9 +301,8 @@ if __name__ == '__main__':
             opt.annotation_path,
             'validation',
             sample_duration=opt.sample_duration,
-            n_samples_for_each_video=n,
+            n_samples_for_each_video=opt.n_val_samples,
             target_transform=target_transform)
-
 
         print("Validation data loaded")
 
@@ -378,7 +329,7 @@ if __name__ == '__main__':
 
         if not opt.no_train:
 
-            loss, acc, main_loss, losses_theta, losses_theta_skip = train_epoch(i, params, train_loader, model, criterion, optimizer, opt, train_logger, train_batch_logger)
+            train_epoch(i, params, train_loader, model, criterion, optimizer, opt, train_logger, train_batch_logger)
 
         # if opt.test_eval_all:
 
@@ -407,13 +358,6 @@ if __name__ == '__main__':
         print("\n")
         print("TESTING")
 
-        # spatial_transform = Compose([
-        #     Scale(int(opt.sample_size / opt.scale_in_test)),
-        #     CornerCrop(opt.sample_size, opt.crop_position_in_test),
-        #     ToTensor(opt.norm_value), norm_method
-        # ])
-
-        # temporal_transform = LoopPadding(opt.sample_duration)
         target_transform = VideoID()
 
         test_data =  HMDB51(

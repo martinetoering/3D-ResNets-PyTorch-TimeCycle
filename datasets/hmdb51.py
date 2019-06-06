@@ -307,6 +307,9 @@ class HMDB51(data.Dataset):
         self.temporal_transform = temporal_transform
         self.target_transform = target_transform
 
+        self.backwards=False
+        self.count = 0
+
         print("\n")
 
     def __getitem__(self, index):
@@ -380,11 +383,35 @@ class HMDB51(data.Dataset):
 
             if not newLen:
                 for i in range(sample_duration):
-                    
+
                     nowid = int(startframe + i)
                     newid = nowid + 1
 
                     video_indices.append(newid)
+
+                    if self.backwards is False:
+
+                        bin_target = 0
+                        
+                        self.count = self.count + 1
+
+                        if self.count == (self.batch_size/2):
+                            
+                            self.backwards = True
+
+                            self.count = 0
+
+                    else:
+
+                        bin_target = 1
+
+                        self.count = self.count + 1
+
+                        if self.count == (self.batch_size/2):
+
+                            self.backwards = False
+
+                            self.count = 0
 
 
                     newid = str(newid).zfill(5)
@@ -632,7 +659,7 @@ class HMDB51(data.Dataset):
 
             # print("META:", meta, "Frame indices:", frame_indices)
 
-            return video, imgs_target, patch_target.data, theta, meta, target, 0, 1
+            return video, imgs_target, patch_target.data, theta, meta, target, bin_target
 
         else:
 

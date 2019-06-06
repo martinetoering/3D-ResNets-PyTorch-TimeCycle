@@ -206,8 +206,7 @@ class CycleTime(nn.Module):
         # Patch feature
 
         x_class = None
-        x_bin_1 = None
-        x_bin_2 = None
+        x_bin = None
 
         # print("\n")
         # print("FORWARD BASE")
@@ -217,17 +216,12 @@ class CycleTime(nn.Module):
 
         if x.size()[2] == self.sample_duration:
             
-            x_pre, x_class, x_bin_1 = self.module(x)
+            x_pre, x_class, x_bin = self.module(x)
 
             startframe = 0
             futureid = startframe + self.videoLen * self.frame_gap
-
+            
             x_pre = x_pre[:, :, startframe:futureid:self.frame_gap, :, :]
-
-            print(range(12, 0))
-            exit()
-            x_bin_2 = torch.index_select(x_bin_1, 2, range(12, 0))
-            # print("XPRE SIZE:", x_pre.size())
 
         else:
             x_pre = self.module(x)
@@ -278,17 +272,17 @@ class CycleTime(nn.Module):
 
         # Base features
         
-        r50_feat1, r50_feat1_pre, r50_feat1_norm, r50_class, r50_bin = self.forward_base(
+        r50_feat1, r50_feat1_pre, r50_feat1_norm, r50_class, r50_bin_class = self.forward_base(
                                                    videoclip1)
 
         # target patch feature
         
-        patch2_feat2, patch2_feat2_pre, patch_feat2_norm, _ = self.forward_base(
+        patch2_feat2, patch2_feat2_pre, patch_feat2_norm, _, _ = self.forward_base(
                                                    patch2, 
                                                    contiguous=True)
 
         # target image feature
-        img_feat2, img_feat2_pre, img_feat2_norm, _ = self.forward_base(
+        img_feat2, img_feat2_pre, img_feat2_norm, _, _ = self.forward_base(
                                                    img2, 
                                                    contiguous=True, 
                                                    can_detach=False)
@@ -436,7 +430,7 @@ class CycleTime(nn.Module):
         back_trans_feats = back_trans_feats.view(-1, *back_trans_feats.shape[2:])
         skip_trans, skip_corrfeat_mat = skip_prediction(img_feat2_norm, back_trans_feats)
 
-        return r50_class, (outputs[:2], patch2_feat2, theta, trans_out2, trans_out3, skip_trans, skip_corrfeat_mat, corrfeat_trans_matrix2)
+        return r50_bin_class, r50_class, (outputs[:2], patch2_feat2, theta, trans_out2, trans_out3, skip_trans, skip_corrfeat_mat, corrfeat_trans_matrix2)
         
         
 

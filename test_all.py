@@ -19,6 +19,6 @@ if __name__ == '__main__':
             number = int(number.split(".")[0])
             print("number:", number)
             if number > 76 and number < 100:
-                os.system("python3 /home/mtoering/3D-ResNets-PyTorch-TimeCycle/main.py --list " + video_list + " --annotation_path " + annotation + " --no_train --resume_path " + str(path_file) + " --result_path " + str(result_folder) + " --name_general_eval_file" + " --print_per_epoch")
+                os.system("python3 /home/martine/3D-ResNets-PyTorch-TimeCycle/main.py --list " + video_list + " --annotation_path " + annotation + " --no_train --resume_path " + str(path_file) + " --result_path " + str(result_folder) + " --name_general_eval_file" + " --print_per_epoch")
             else:
                 continue
