@@ -5,15 +5,15 @@ import sys
 import numpy as np
 import pandas as pd
 
-def eval_hmdb51(epoch_output_path, annotation_path, prediction_path, test_subset, top_k, general_output_path, epoch):
+def eval_hmdb51(epoch_output_path, annotation_path, prediction_path, test_subset, top_k, general_output_path, epoch, general_eval_file=False):
     hmdb_classification = HMDBclassification(epoch_output_path, annotation_path, prediction_path, subset=test_subset, top_k=top_k)
     hmdb_classification.evaluate(epoch_output_path)
 
     accuracy = hmdb_classification.hit_at_k
     error = hmdb_classification.error 
 
-    if general_output_path:
-        f = open(general_output_path, 'a')
+    if general_eval_file:
+        f = open(general_output_path, 'a+')
         f.write(str(epoch) + "\t" + str(accuracy) + "\t" + str(error) + "\n") 
         f.close()
     

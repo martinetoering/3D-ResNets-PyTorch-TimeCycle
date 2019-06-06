@@ -132,7 +132,7 @@ def val_epoch(epoch, params, data_loader, model, criterion, opt, logger):
             targets = targets.cuda(async=True)
         inputs = Variable(inputs.cuda(), volatile=True)
         targets = Variable(targets, volatile=True)
-        _, _, _, outputs = model.forward_base(inputs)
+        _, _, _, outputs, _ = model.forward_base(inputs)
         loss = criterion(outputs, targets)
         acc = calculate_accuracy(outputs, targets)
 

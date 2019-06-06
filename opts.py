@@ -278,7 +278,7 @@ def parse_opts():
     # parser.add_argument(
     #     '--manual_seed', default=1, type=int, help='Manually set random seed')
     parser.add_argument(
-        '--name_general_eval_file',
+        '--general_eval_file',
         action='store_true')
     args = parser.parse_args()
 

@@ -46,7 +46,7 @@ def test(data_loader, model, opt, class_names, val_json_name):
         data_time.update(time.time() - end_time)
 
         inputs = Variable(inputs.cuda(), volatile=True)
-        _, _, _, outputs = model.forward_base(inputs)
+        _, _, _, outputs, _ = model.forward_base(inputs)
 
         if not opt.no_softmax_in_test:
             outputs = F.softmax(outputs)
