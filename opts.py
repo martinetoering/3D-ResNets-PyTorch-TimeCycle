@@ -177,7 +177,7 @@ def parse_opts():
 
     #Device options
     parser.add_argument(
-        '--gpu-id', 
+        '--gpu_id', 
         default='0', 
         type=str,
         help='id(s) for CUDA_VISIBLE_DEVICES')

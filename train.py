@@ -51,10 +51,9 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
 
     losses_combined = AverageMeter()
 
-
     end_time = time.time()
     
-    for i, (video, img, patch2, theta, meta, targets, targets_bin) in enumerate(data_loader):
+    for i, (video, img, patch2, theta, meta, targets) in enumerate(data_loader):
 
         # Measure data loading time
 
@@ -68,18 +67,19 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
         patch2 = Variable(patch2.cuda())
         theta = Variable(theta.cuda())
 
-        folder_paths = meta['folder_path']
-        startframes = meta['startframe']
-        future_idxs = meta['future_idx']
+        # folder_paths = meta['folder_path']
+        # startframes = meta['startframe']
+        # future_idxs = meta['future_idx']
 
         if not opt.no_cuda:
             targets = targets.cuda(async=True)
-            targets_bin = targets_bin.cuda(async=True)
-        
         targets = Variable(targets)
-        targets_bin = Variable(targets_bin)
 
-        outputs_bin, outputs_vc, outputs = model(video, patch2, img, theta)
+        targets_bin, outputs_bin, outputs_vc, outputs = model(video, patch2, img, theta)
+
+        if not opt.no_cuda:
+            targets_bin = targets_bin.cuda(async=True)
+        targets_bin = Variable(targets_bin)
 
         # HMDB video classification
 
@@ -122,7 +122,6 @@ def train_epoch(epoch, params, data_loader, model, criterion, optimizer, opt,
         loss_combined = loss + loss_vc + loss_bin
 
         losses_combined.update(loss_combined[0].data, video.size(0))
-       
         optimizer.zero_grad()        
         
         # Combine losses

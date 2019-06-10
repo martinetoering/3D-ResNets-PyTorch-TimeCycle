@@ -8,6 +8,8 @@ python3 main.py --annotation_path hmdb51_1.json --list hmdb_1.txt \
 
 python3 main.py --timecycle_weight 50 --binary_class_weight 4 --annotation_path hmdb51_2.json --list hmdb_2.txt --result_path result --videoLen 3 --frame_gap 4 --predDistance 0 --val
 
+python3 3D-ResNets-PyTorch-TimeCycle/main.py --timecycle_weight 25 --binary_class_weight 2 --annotation_path hmdb51_1.json --list hmdb_1.txt --result_path res50_bin_test --videoLen 3 --frame_gap 4 --predDistance 0 --val
+
 
 python3 test_all.py <checkpoint_folder_path>
 

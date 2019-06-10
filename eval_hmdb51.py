@@ -13,7 +13,7 @@ def eval_hmdb51(epoch_output_path, annotation_path, prediction_path, test_subset
     error = hmdb_classification.error 
 
     if general_eval_file:
-        f = open(general_output_path, 'a+')
+        f = open(general_output_path, 'a')
         f.write(str(epoch) + "\t" + str(accuracy) + "\t" + str(error) + "\n") 
         f.close()
     

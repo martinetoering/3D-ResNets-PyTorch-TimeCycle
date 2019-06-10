@@ -147,7 +147,8 @@ if __name__ == '__main__':
                              pretrained=opt.pretrained_imagenet, 
                              temporal_out=params['videoLen'], 
                              T=opt.T, 
-                             hist=opt.hist)
+                             hist=opt.hist,
+                             batch_size=opt.batch_size)
 
     if not opt.no_cuda:
         model = model.cuda()
@@ -214,7 +215,6 @@ if __name__ == '__main__':
 
         opts_file = os.path.join(opt.result_path, 'opts.json')
 
-      
 
     if not opt.no_train:
 
@@ -330,19 +330,6 @@ if __name__ == '__main__':
         if not opt.no_train:
 
             train_epoch(i, params, train_loader, model, criterion, optimizer, opt, train_logger, train_batch_logger)
-
-        # if opt.test_eval_all:
-
-        #     # if i % opt.checkpoint == 0:
-        #     validation_loss, file_json = val_test_eval_epoch(i, params, val_loader, model, criterion, opt, val_logger, validation_data.class_names)
-        #     name_general = opt.result_path + '/' + "results" + '_all' + '.txt'
-        #     name = opt.result_path + '/' + "results_" + str(i) + '.txt'
-        #     eval_hmdb51.eval_hmdb51(name, opt.annotation_path, file_json, "validation", opt.top_k,  name_general, i)
-
-        # if not opt.no_train and opt.test_eval_all:
-
-        #     # if i % opt.checkpoint == 0:
-        #     scheduler.step(validation_loss)
 
         if opt.val:
 

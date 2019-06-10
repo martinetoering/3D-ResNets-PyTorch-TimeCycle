@@ -5,6 +5,7 @@ from torch.autograd import Variable
 import torch.nn as nn
 from . import inflate
 import numpy as np
+import random
 
 
 class InflatedResNet(torch.nn.Module):
@@ -13,7 +14,8 @@ class InflatedResNet(torch.nn.Module):
                  sample_duration=13,
                  class_nb=1000, 
                  conv_class=True,
-                 bin_class=True):
+                 bin_class=True,
+                 batch_size=4):
         """
         Args:
             conv_class: Whether to use convolutional layer as classifier to
@@ -22,6 +24,7 @@ class InflatedResNet(torch.nn.Module):
         super(InflatedResNet, self).__init__()
         self.conv_class = conv_class
         self.sample_duration = sample_duration
+        self.batch_size = batch_size
 
         self.conv1 = inflate.inflate_conv(
             resnet2d.conv1, time_dim=1, time_padding=0, center=True)
@@ -77,33 +80,65 @@ class InflatedResNet(torch.nn.Module):
 
             x_1 = x
 
+            # print("Tensor from backbone:", x_1.size())
+
+            batch_size = x_1.size(0)
+            # print("Batch size:", batch_size)
+
+            forward_indices = random.sample(range(0, batch_size), 2)
+            # print("Forward indices:", forward_indices)
+
+            backward_indices = list(set(range(0, batch_size)) - set(forward_indices))
+            # print("Backward indices:", backward_indices)
+
+            forward_backward_labels = np.empty([batch_size])
+            # print("Forward backward labels:", forward_backward_labels)
+
+            # Forward is 0, backward 1
+            forward_backward_labels[forward_indices] = 0
+            forward_backward_labels[backward_indices] = 1
+            forward_backward_labels = forward_backward_labels.astype(int)
+            # print("Correct forward backward labels:", forward_backward_labels.tolist())
+            forward_backward_labels = torch.from_numpy(forward_backward_labels)
+
+            forward_indices = Variable(torch.LongTensor(forward_indices).cuda())
+            backward_indices = Variable(torch.LongTensor(backward_indices).cuda())
+
+            x_2 = torch.index_select(x_1, 0, forward_indices)
+            x_3 = torch.index_select(x_1, 0, backward_indices)
+
+            # print("Forward tensor:", x_2.size())
+            # print("Backward tensor (not inversed):", x_3.size())
+
+            inv_idx = Variable(torch.arange(x_3.size(2)-1, -1, -1).long().cuda())
+            # print("Inv_indx", inv_idx)
+            # or equivalently torch.range(tensor.size(0)-1, 0, -1).long()
+            
+            x_3 = x_3.index_select(2, inv_idx)
+            # print("Backward tensor (inversed)", x_3.size())
+            # or equivalently inv_tensor = tensor[inv_idx]
+
             x_1 = self.maxpool1(x_1)
+            x_2 = self.maxpool1(x_2)
+            x_3 = self.maxpool1(x_3)
 
             x_1 = self.layer4(x_1)
+            x_2 = self.layer4(x_2)
+            x_3 = self.layer4(x_3)
 
             if self.conv_class:
 
                 x_1 = self.avgpool(x_1)
+                x_2 = self.avgpool(x_2)
+                x_3 = self.avgpool(x_3)
 
-                batch = x_1.size(0)
-                batch_half = int(batch / 2)
-
-                x_2 = x_1[0:batch_half, :, :, :, :]
-                # print("x_2", x_2.size())
-
-                x_3 = x_1[batch_half:batch, :, :, :, :]
-                # print("x_3", x_3.size())
-
-                indices = Variable(torch.from_numpy(np.array([12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0])).long().cuda())
-        
-                x_3 = torch.index_select(x_3, 2, indices)
+                # indices = Variable(torch.from_numpy(np.array([12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0])).long().cuda())
+                # x_3 = torch.index_select(x_3, 2, indices)
                 # print("x_3 now", x_3.size())
 
-                x_2 = self.bin_classifier(x_2)
-
-                x_3 = self.bin_classifier(x_3)
-
                 x_1 = self.classifier(x_1)
+                x_2 = self.bin_classifier(x_2)
+                x_3 = self.bin_classifier(x_3)
                 
                 x_1 = x_1.squeeze(3)
                 x_1 = x_1.squeeze(3)
@@ -131,8 +166,9 @@ class InflatedResNet(torch.nn.Module):
                 x_3 = self.fc(x_3reshape)
 
             x_bin = torch.cat((x_2, x_3), 0)
+            # print("Forward backward tensor", x_bin.size())
 
-            return x, x_1, x_bin
+            return x, x_1, x_bin, forward_backward_labels
 
 
 def inflate_reslayer(reslayer2d):

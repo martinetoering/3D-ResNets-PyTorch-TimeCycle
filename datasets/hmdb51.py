@@ -322,15 +322,10 @@ class HMDB51(data.Dataset):
 
         if self.is_train:
 
-            # print("FRAME INDICES for train:", frame_indices)
-
             folder_path = self.jpgfiles[index]
             fnum = self.fnums[index]
 
             video = torch.Tensor(self.sample_duration, 3, self.cropSize, self.cropSize)
-
-            # imgs = torch.Tensor(self.videoLen, 3, self.cropSize, self.cropSize)
-
             imgs_target  = torch.Tensor(2, 3, self.cropSize, self.cropSize)
             patch_target = torch.Tensor(2, 3, self.cropSize, self.cropSize)
 
@@ -355,8 +350,7 @@ class HMDB51(data.Dataset):
                 future_idx = startframe + current_len - 1
 
                 # print("start frame: ", startframe)
-                # print("future id:", future_idx)
-                
+                # print("future id:", future_idx)  
 
             else:
                 newLen = int(fnum * 2.0 / 3.0)
@@ -374,10 +368,6 @@ class HMDB51(data.Dataset):
             crop_offset_x = -1
             crop_offset_y = -1
             ratio = random.random() * (4/3 - 3/4) + 3/4
-
-            frame_indices = list(range(startframe, (startframe+self.sample_duration)))
-            
-            # print("start frame: ", startframe, "future id:", future_idx, "frame indices", frame_indices, len(frame_indices))
             
             video_indices = []
 
@@ -388,31 +378,6 @@ class HMDB51(data.Dataset):
                     newid = nowid + 1
 
                     video_indices.append(newid)
-
-                    if self.backwards is False:
-
-                        bin_target = 0
-                        
-                        self.count = self.count + 1
-
-                        if self.count == (self.batch_size/2):
-                            
-                            self.backwards = True
-
-                            self.count = 0
-
-                    else:
-
-                        bin_target = 1
-
-                        self.count = self.count + 1
-
-                        if self.count == (self.batch_size/2):
-
-                            self.backwards = False
-
-                            self.count = 0
-
 
                     newid = str(newid).zfill(5)
                     img_path = os.path.join(folder_path, "image_{}.jpg".format(newid))
@@ -550,10 +515,8 @@ class HMDB51(data.Dataset):
 
                 
 
-            #print("FUtUrE IMGS:", future_imgs.size(), "VIDEO:", video.size())
-            #print("video indices", video_indices, len(video_indices), "future imgs indices:", future_imgs_indices)
-
-            #exit()
+            # print("FUtUrE IMGS:", future_imgs.size(), "VIDEO:", video.size())
+            # print("Video indices are:", video_indices, "Of size:", len(video_indices), "Future imgs indices (first matters):", future_imgs_indices)
 
             for i in range(2):
 
@@ -639,27 +602,19 @@ class HMDB51(data.Dataset):
                     theta_batch=theta_batch)
 
             theta = theta.view(2, 3)
-
-            # print("IMgs tartget before:", imgs_target.size())
-
             imgs_target = imgs_target[0:1]
-
-            # print("IMgs tartget after:", imgs_target.size())
-
             patch_target = patch_target[0:1]
 
-            meta = {'folder_path': folder_path, 'startframe': startframe, 'future_idx': future_idx, 'frame_gap': float(frame_gap), 'crop_offset_x': crop_offset_x, 'crop_offset_y': crop_offset_y, 'dataset': 'vlog'}
-
             sample = self.name_to_sample[folder_path]
-            # sample['frame_indices'] = indices
             target = sample
 
             if self.target_transform is not None:
                 target = self.target_transform(target)
 
-            # print("META:", meta, "Frame indices:", frame_indices)
+            meta = {'folder_path': folder_path, 'startframe': startframe, 'future_idx': future_idx, 'frame_gap': float(frame_gap), 'crop_offset_x': crop_offset_x, 'crop_offset_y': crop_offset_y, 'dataset': 'vlog'}
+            # print("Meta:", meta)
 
-            return video, imgs_target, patch_target.data, theta, meta, target, bin_target
+            return video, imgs_target, patch_target.data, theta, meta, target
 
         else:
 
