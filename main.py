@@ -85,7 +85,7 @@ if __name__ == '__main__':
     os.environ['CUDA_VISIBLE_DEVICES'] = opt.gpu_id
 
     print("Torch version:", torch.__version__)
-    print("Train, val, test, evaluate:", not opt.no_train, opt.val, not opt.no_test, not opt.no_eval)
+    print("Train, val, test, evaluate:", not opt.no_train, opt.no_val, not opt.no_test, not opt.no_eval)
 
     if opt.root_path != '':
         opt.video_path = os.path.join(opt.root_path, opt.video_path)
@@ -106,10 +106,6 @@ if __name__ == '__main__':
             opt.resume_path = os.path.join(opt.root_path, opt.resume_path)
         if opt.pretrain_path:
             opt.pretrain_path = os.path.join(opt.root_path, opt.pretrain_path)
-
-    if opt.val and opt.test_eval_all:
-        print("Choose validation with test and eval, or other validation, not both")
-        exit()
 
     params, state = get_params(opt)
 
@@ -279,7 +275,7 @@ if __name__ == '__main__':
         print("\n")
 
 
-    if opt.val or opt.test_eval_all:
+    if not opt.no_val:
 
         print("VALIDATION")
         print("\n")
@@ -288,12 +284,6 @@ if __name__ == '__main__':
             os.path.join(opt.result_path, val_log_file), ['epoch', 'loss', 'acc'])
 
         target_transform = ClassLabel()
-
-        if opt.val:
-            n = opt.n_val_samples
-
-        if opt.test_eval_all:
-            n = 0
 
         validation_data = HMDB51(
             params,
@@ -331,11 +321,11 @@ if __name__ == '__main__':
 
             train_epoch(i, params, train_loader, model, criterion, optimizer, opt, train_logger, train_batch_logger)
 
-        if opt.val:
+        if not opt.no_val:
 
             validation_loss = val_epoch(i, params, val_loader, model, criterion, opt, val_logger)
 
-        if not opt.no_train and opt.val:
+        if not opt.no_train and not opt.no_val:
 
             scheduler.step(validation_loss)
 
@@ -363,7 +353,7 @@ if __name__ == '__main__':
             num_workers=opt.n_threads,
             pin_memory=True)
         
-        if not opt.no_train and opt.val:
+        if not opt.no_train and not opt.no_val:
             epoch = opt.n_epochs
         else:
             epoch = opt.begin_epoch - 1
@@ -377,9 +367,8 @@ if __name__ == '__main__':
         print("\n")
         print("EVALUATING")
 
-        if not opt.no_train and opt.val:
+        if not opt.no_train and not opt.no_val:
             epoch = opt.n_epochs
-
         else:
             epoch = opt.begin_epoch - 1
             
@@ -390,4 +379,6 @@ if __name__ == '__main__':
         prediction_file = os.path.join(opt.result_path, 'val_{}.json'.format(val_json_name))
         subset = "validation"
 
-        eval_hmdb51.eval_hmdb51(eval_path, opt.annotation_path, prediction_file, subset, opt.top_k, epoch)
+        epoch, accuracy, error = eval_hmdb51.eval_hmdb51(eval_path, opt.annotation_path, prediction_file, subset, opt.top_k, epoch)
+
+        print("Results for epoch ", epoch, "are: acc:", accuracy, "err@", opt.top_k, ":", error)

@@ -11,12 +11,7 @@ def eval_hmdb51(epoch_output_path, annotation_path, prediction_path, test_subset
 
     accuracy = hmdb_classification.hit_at_k
     error = hmdb_classification.error 
-
-    # if general_eval_file:
-    #     D = open(general_output_path, 'a')
-    #     D.write("\n" + str(epoch) + "\t" + str(accuracy) + "\t" + str(error) + "\n") 
-    #     D.close()
-    
+   
     if epoch_output_path:
         f = open(epoch_output_path, 'a')
         f.write("Acc: " + str(hmdb_classification.hit_at_k))

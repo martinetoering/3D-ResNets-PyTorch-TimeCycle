@@ -12,10 +12,9 @@ class InflatedResNet(torch.nn.Module):
     def __init__(self, 
                  resnet2d, 
                  sample_duration=13,
-                 class_nb=1000, 
-                 conv_class=True,
-                 bin_class=True,
-                 batch_size=4):
+                 batch_size=4,
+                 conv_class=False,
+                 bin_class=False):
         """
         Args:
             conv_class: Whether to use convolutional layer as classifier to
@@ -23,6 +22,7 @@ class InflatedResNet(torch.nn.Module):
         """
         super(InflatedResNet, self).__init__()
         self.conv_class = conv_class
+        self.bin_class = bin_class
         self.sample_duration = sample_duration
         self.batch_size = batch_size
 
@@ -35,17 +35,23 @@ class InflatedResNet(torch.nn.Module):
         self.layer1 = inflate_reslayer(resnet2d.layer1)
         self.layer2 = inflate_reslayer(resnet2d.layer2)
         self.layer3 = inflate_reslayer(resnet2d.layer3)
+
+        self.maxpool = inflate.inflate_pool(resnet2d.maxpool, time_dim=3, time_padding=1, time_stride=2)
         
-        self.layer3_b = inflate_reslayer(resnet2d.layer3_b)
-        self.layer4 = inflate_reslayer(resnet2d.layer4)
+        self.layer4 = inflate_reslayer(resnet2d.layer4, True)
 
         if conv_class:
-            self.avgpool = inflate.inflate_pool(resnet2d.avgpool, time_dim=1)
+            self.avgpool = inflate.inflate_pool(resnet2d.avgpool, time_dim=3)
             self.classifier = torch.nn.Conv3d(
                 in_channels=2048,
                 out_channels=51,
                 kernel_size=(1, 1, 1),
                 bias=True)
+
+        else:
+            self.avgpool = inflate.inflate_pool(
+                resnet2d.avgpool, time_dim=3)
+            self.fc = inflate.inflate_linear(resnet2d.fc, 1)
 
         if bin_class:
             self.bin_classifier = torch.nn.Conv3d(
@@ -55,10 +61,7 @@ class InflatedResNet(torch.nn.Module):
                 bias=True)
 
         else:
-            final_time_dim = 1
-            self.avgpool = inflate.inflate_pool(
-                resnet2d.avgpool, time_dim=final_time_dim)
-            self.fc = inflate.inflate_linear(resnet2d.fc, 1)
+            self.fc_bin = inflate.inflate_linear(resnet2d.fc_bin, 1)
 
 
     def forward(self, x):
@@ -84,6 +87,8 @@ class InflatedResNet(torch.nn.Module):
 
             return x
 
+        # After backbone
+
         else:
 
             x_1 = x
@@ -91,10 +96,10 @@ class InflatedResNet(torch.nn.Module):
             # print("Tensor from backbone:", x_1.size())
 
             batch_size = x_1.size(0)
+            
             # print("Batch size:", batch_size)
 
             if batch_size == self.batch_size:
-
 
                 ###################### Branch 3 #####################
 
@@ -131,10 +136,10 @@ class InflatedResNet(torch.nn.Module):
                 # print("Backward tensor (inversed)", x_3.size())
                 # or equivalently inv_tensor = tensor[inv_idx]
 
-                ##########################################
-
                 # The forward backward binary classification tensor
                 x_bin = torch.cat((x_2, x_3), 0)
+
+                ####################################################
             
             else:
 
@@ -143,41 +148,57 @@ class InflatedResNet(torch.nn.Module):
                 forward_backward_labels = forward_backward_labels.astype(int)
                 forward_backward_labels = torch.from_numpy(forward_backward_labels)
             
-            x_bin = self.maxpool1(x_bin)
-            # print("X_Bin after maxpool:", x_bin.size())
+            x_bin = self.maxpool(x_bin)
+            #print("X_Bin after maxpool:", x_bin.size())
             x_bin = self.layer4(x_bin)
-            # print("X_bin after conv5:", x_bin.size())
+            #print("X_bin after conv5:", x_bin.size())
 
-            x_1 = self.maxpool1(x_1)
-            # print("X (video classification) after maxpool:", x_1.size())
+            x_1 = self.maxpool(x_1)
+            #print("X (video classification) after maxpool:", x_1.size())
             x_1 = self.layer4(x_1)
-            # print("X (video classification) after conv5:", x_1.size())
+            #print("X (video classification) after conv5:", x_1.size())
 
+            # Branch 2
 
             if self.conv_class:
 
                 x_1 = self.avgpool(x_1)
 
-                # print("X (video classification) after avgpool:", x_1.size())
+                #print("X (video classification) after avgpool:", x_1.size())
                 
+                x_1 = self.classifier(x_1)
+
+                #print("X (video classification) after conv classifier:", x_1.size())
+
+                
+                x_1 = x_1.squeeze(3)
+                #print("X (video classification) after squeeze:", x_1.size())
+                x_1 = x_1.squeeze(3)
+                #print("X (video classification) after squeeze:", x_1.size())
+                x_1 = x_1.mean(2)
+                #print("X (video classification) after mean:", x_1.size())
+
+            else:
+
+                x_1 = self.avgpool(x_1)
+                # print("X (video classification) After avgpool:", x_1.size())
+                x_reshape = x_1.view(x_1.size(0), -1)
+                # print("X (video classification) After reshape:", x_reshape.size())
+                x_1 = self.fc(x_reshape)
+                # print("X (video classification) After fc:", x_1.size())
+
+
+            # Branch 3
+
+            if self.bin_class:
+
                 x_bin = self.avgpool(x_bin)
 
                 # print("X_bin (forward backward) after avgpool:", x_bin.size())
 
-                x_1 = self.classifier(x_1)
-
-                # print("X (video classification) after conv classifier:", x_1.size())
-
                 x_bin = self.bin_classifier(x_bin)
 
                 # print("X_bin (forward backward) after conv classifier:", x_bin.size())
-                
-                x_1 = x_1.squeeze(3)
-                # print("X (video classification) after squeeze:", x_1.size())
-                x_1 = x_1.squeeze(3)
-                # print("X (video classification) after squeeze:", x_1.size())
-                x_1 = x_1.mean(2)
-                # print("X (video classification) after mean:", x_1.size())
 
                 x_bin = x_bin.squeeze(3)
                 # print("X_bin (forward backward) after squeeze:", x_bin.size())
@@ -191,13 +212,13 @@ class InflatedResNet(torch.nn.Module):
                 # print("X_bin (forward backward) after all:", x_bin.size())
 
             else:
-                x_1 = self.avgpool(x_1)
-                x_reshape = x_1.view(x_1.size(0), -1)
-                x_1 = self.fc(x_reshape)
-
+            
                 x_bin = self.avgpool(x_bin)
+                # print("X_bin (forward backward) After avgpool:", x_bin.size())
                 x_binreshape = x_bin.view(x_bin.size(0), -1)
-                x_bin = self.fc(x_binreshape)
+                # print("X_bin (forward backward) After reshape:", x_binreshape.size())
+                x_bin = self.fc_bin(x_binreshape)
+                # print("X_bin (forward backward) After fc bin:", x_bin.size())
 
             # print("Output for video classification tensor", x_1.size())
             # print("Output for Forward backward tensor", x_bin.size())
@@ -207,16 +228,16 @@ class InflatedResNet(torch.nn.Module):
             return x, x_1, x_bin, forward_backward_labels
 
 
-def inflate_reslayer(reslayer2d):
+def inflate_reslayer(reslayer2d, timedim3=False):
     reslayers3d = []
     for layer2d in reslayer2d:
-        layer3d = Bottleneck3d(layer2d)
+        layer3d = Bottleneck3d(layer2d, timedim3)
         reslayers3d.append(layer3d)
     return torch.nn.Sequential(*reslayers3d)
 
 
 class Bottleneck3d(torch.nn.Module):
-    def __init__(self, bottleneck2d):
+    def __init__(self, bottleneck2d, timedim3=False):
         super(Bottleneck3d, self).__init__()
 
         spatial_stride = bottleneck2d.conv2.stride[0]
@@ -227,11 +248,21 @@ class Bottleneck3d(torch.nn.Module):
 
         self.bn1 = inflate.inflate_batch_norm(bottleneck2d.bn1)
 
+        if timedim3:
+            time_dim = 3
+            time_padding = 1
+            time_stride = spatial_stride
+        else:
+            time_dim = 1
+            time_padding = 0
+            time_stride = 1
+
+
         self.conv2 = inflate.inflate_conv(
             bottleneck2d.conv2,
-            time_dim=1,
-            time_padding=0,
-            time_stride=1,
+            time_dim=time_dim,
+            time_padding=time_padding,
+            time_stride=time_stride,
             center=True)
 
         self.bn2 = inflate.inflate_batch_norm(bottleneck2d.bn2)
@@ -245,7 +276,7 @@ class Bottleneck3d(torch.nn.Module):
 
         if bottleneck2d.downsample is not None:
             self.downsample = inflate_downsample(
-                bottleneck2d.downsample, time_stride=1)
+                bottleneck2d.downsample, time_stride=time_stride)
         else:
             self.downsample = None
 

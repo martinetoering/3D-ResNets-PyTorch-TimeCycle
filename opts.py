@@ -13,13 +13,13 @@ def parse_opts():
 
     parser.add_argument(
         '--timecycle_weight',
-        default=50,
+        default=25,
         type=int,
         help='Weight to multiply TimeCycle loss with before adding to hmdb classification loss')
 
     parser.add_argument(
         '--binary_class_weight',
-        default=4,
+        default=2,
         type=int,
         help='Weight to multiply binary classification loss with before adding to hmdb classification loss')
 
@@ -208,15 +208,10 @@ def parse_opts():
         help='If true, training is not performed.')
     parser.set_defaults(no_train=False)
     parser.add_argument(
-        '--test_eval_all',
+        '--no_val',
         action='store_true',
-        help='If true, all epochs are tested and evaluated in validation step')
-    parser.set_defaults(test_eval_all=False)
-    parser.add_argument(
-        '--val',
-        action='store_true',
-        help='If true, validation step with n_val_samples is performed (no testing or evaluating)')
-    parser.set_defaults(val=False)
+        help='If true, no validation step with n_val_samples is performed')
+    parser.set_defaults(no_val=False)
     parser.add_argument(
         '--no_test', action='store_true', help='If true, no test is performed')
     parser.set_defaults(no_test=False)
@@ -230,9 +225,6 @@ def parse_opts():
     parser.set_defaults(no_eval=False)
     parser.add_argument(
         '--top_k', default=1, type=int, help='Top 1 or Top 5 accuracy')
-    parser.add_argument(
-        '--print_per_epoch', action='store_true')
-    parser.set_defaults(print_per_epoch=False)
 
     parser.add_argument(
         '--no_softmax_in_test',
