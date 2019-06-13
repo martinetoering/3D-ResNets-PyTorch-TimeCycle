@@ -5,21 +5,24 @@ import sys
 import numpy as np
 import pandas as pd
 
-def eval_hmdb51(epoch_output_path, annotation_path, prediction_path, test_subset, top_k, general_output_path, epoch, general_eval_file=False):
+def eval_hmdb51(epoch_output_path, annotation_path, prediction_path, test_subset, top_k, epoch):
     hmdb_classification = HMDBclassification(epoch_output_path, annotation_path, prediction_path, subset=test_subset, top_k=top_k)
     hmdb_classification.evaluate(epoch_output_path)
 
     accuracy = hmdb_classification.hit_at_k
     error = hmdb_classification.error 
 
-    if general_eval_file:
-        f = open(general_output_path, 'a')
-        f.write(str(epoch) + "\t" + str(accuracy) + "\t" + str(error) + "\n") 
-        f.close()
+    # if general_eval_file:
+    #     D = open(general_output_path, 'a')
+    #     D.write("\n" + str(epoch) + "\t" + str(accuracy) + "\t" + str(error) + "\n") 
+    #     D.close()
     
-    f = open(epoch_output_path, 'a')
-    f.write("Acc: " + str(hmdb_classification.hit_at_k))
-    f.close()
+    if epoch_output_path:
+        f = open(epoch_output_path, 'a')
+        f.write("Acc: " + str(hmdb_classification.hit_at_k))
+        f.close()
+
+    return epoch, accuracy, error
 
 class HMDBclassification(object):
 
@@ -39,15 +42,15 @@ class HMDBclassification(object):
             ground_truth_filename)
         self.prediction = self._import_prediction(prediction_filename)
 
-        
-        with open(name, 'w') as f:
-            f.write('{}\n'.format(name))
-            print("Write evaluation results to file:", name)
-            f.write('[INIT] Loaded annotations from {} subset.\n'.format(subset))
-            nr_gt = len(self.ground_truth)
-            f.write('\tNumber of ground truth instances: {}\n'.format(nr_gt))
-            nr_pred = len(self.prediction)
-            f.write('\tNumber of predictions: {}\n'.format(nr_pred))
+        if name:
+            with open(name, 'w') as f:
+                f.write('{}\n'.format(name))
+                print("Write evaluation results to file:", name)
+                f.write('[INIT] Loaded annotations from {} subset.\n'.format(subset))
+                nr_gt = len(self.ground_truth)
+                f.write('\tNumber of ground truth instances: {}\n'.format(nr_gt))
+                nr_pred = len(self.prediction)
+                f.write('\tNumber of predictions: {}\n'.format(nr_pred))
 
     def _import_ground_truth(self, ground_truth_filename):
         """Reads ground truth file, checks if it is well formatted, and returns
@@ -128,11 +131,12 @@ class HMDBclassification(object):
         """
         hit_at_k = compute_video_hit_at_k(self.ground_truth,
                                           self.prediction, top_k=self.top_k)
-        with open(name, 'a') as f:
-            f.write('[RESULTS] Performance on ActivityNet untrimmed video '
-               'classification task.\n')
-            f.write('\tError@{}: {}\n'.format(self.top_k, 1.0 - hit_at_k))
-            #print '\tAvg Hit@{}: {}'.format(self.top_k, avg_hit_at_k)
+        if name:
+            with open(name, 'a') as f:
+                f.write('[RESULTS] Performance on ActivityNet untrimmed video '
+                   'classification task.\n')
+                f.write('\tError@{}: {}\n'.format(self.top_k, 1.0 - hit_at_k))
+                #print '\tAvg Hit@{}: {}'.format(self.top_k, avg_hit_at_k)
         self.hit_at_k = hit_at_k
         self.error = 1.0 - hit_at_k
 

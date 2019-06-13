@@ -62,15 +62,23 @@ class InflatedResNet(torch.nn.Module):
 
 
     def forward(self, x):
+        # print("Before conv1", x.size())
         x = self.conv1(x)
+        # print("After conv1", x.size())
         x = self.bn1(x)
+
         x = self.relu(x)
         x = self.maxpool1(x)
+        # print("After bn1, relu, maxpool1", x.size())
 
         x = self.layer1(x)
+        # print("After conv2", x.size())
+
         x = self.layer2(x)
-    
+        # print("After conv3", x.size())
+
         x = self.layer3(x)
+        # print("After conv4", x.size())
 
         if x.size()[2] != self.sample_duration:
 
@@ -85,88 +93,116 @@ class InflatedResNet(torch.nn.Module):
             batch_size = x_1.size(0)
             # print("Batch size:", batch_size)
 
-            forward_indices = random.sample(range(0, batch_size), 2)
-            # print("Forward indices:", forward_indices)
+            if batch_size == self.batch_size:
 
-            backward_indices = list(set(range(0, batch_size)) - set(forward_indices))
-            # print("Backward indices:", backward_indices)
 
-            forward_backward_labels = np.empty([batch_size])
-            # print("Forward backward labels:", forward_backward_labels)
+                ###################### Branch 3 #####################
 
-            # Forward is 0, backward 1
-            forward_backward_labels[forward_indices] = 0
-            forward_backward_labels[backward_indices] = 1
-            forward_backward_labels = forward_backward_labels.astype(int)
-            # print("Correct forward backward labels:", forward_backward_labels.tolist())
-            forward_backward_labels = torch.from_numpy(forward_backward_labels)
+                forward_indices = random.sample(range(0, batch_size), 2)
+                # print("Forward indices:", forward_indices)
 
-            forward_indices = Variable(torch.LongTensor(forward_indices).cuda())
-            backward_indices = Variable(torch.LongTensor(backward_indices).cuda())
+                backward_indices = list(set(range(0, batch_size)) - set(forward_indices))
+                # print("Backward indices:", backward_indices)
 
-            x_2 = torch.index_select(x_1, 0, forward_indices)
-            x_3 = torch.index_select(x_1, 0, backward_indices)
+                forward_backward_labels = np.empty([batch_size])
+                # print("Forward backward labels:", forward_backward_labels)
 
-            # print("Forward tensor:", x_2.size())
-            # print("Backward tensor (not inversed):", x_3.size())
+                # Forward is 0, backward 1
+                forward_backward_labels[forward_indices] = 0
+                forward_backward_labels[backward_indices] = 1
+                forward_backward_labels = forward_backward_labels.astype(int)
+                # print("Correct forward backward labels:", forward_backward_labels.tolist())
+                forward_backward_labels = torch.from_numpy(forward_backward_labels)
 
-            inv_idx = Variable(torch.arange(x_3.size(2)-1, -1, -1).long().cuda())
-            # print("Inv_indx", inv_idx)
-            # or equivalently torch.range(tensor.size(0)-1, 0, -1).long()
+                forward_indices = Variable(torch.LongTensor(forward_indices).cuda())
+                backward_indices = Variable(torch.LongTensor(backward_indices).cuda())
+
+                x_2 = torch.index_select(x_1, 0, forward_indices)
+                x_3 = torch.index_select(x_1, 0, backward_indices)
+
+                # print("Forward tensor:", x_2.size())
+                # print("Backward tensor (not inversed):", x_3.size())
+
+                inv_idx = Variable(torch.arange(x_3.size(2)-1, -1, -1).long().cuda())
+                # print("Inv_indx", inv_idx)
+                # or equivalently torch.range(tensor.size(0)-1, 0, -1).long()
+                
+                x_3 = x_3.index_select(2, inv_idx)
+                # print("Backward tensor (inversed)", x_3.size())
+                # or equivalently inv_tensor = tensor[inv_idx]
+
+                ##########################################
+
+                # The forward backward binary classification tensor
+                x_bin = torch.cat((x_2, x_3), 0)
             
-            x_3 = x_3.index_select(2, inv_idx)
-            # print("Backward tensor (inversed)", x_3.size())
-            # or equivalently inv_tensor = tensor[inv_idx]
+            else:
+
+                x_bin = x_1
+                forward_backward_labels = np.empty([batch_size])
+                forward_backward_labels = forward_backward_labels.astype(int)
+                forward_backward_labels = torch.from_numpy(forward_backward_labels)
+            
+            x_bin = self.maxpool1(x_bin)
+            # print("X_Bin after maxpool:", x_bin.size())
+            x_bin = self.layer4(x_bin)
+            # print("X_bin after conv5:", x_bin.size())
 
             x_1 = self.maxpool1(x_1)
-            x_2 = self.maxpool1(x_2)
-            x_3 = self.maxpool1(x_3)
-
+            # print("X (video classification) after maxpool:", x_1.size())
             x_1 = self.layer4(x_1)
-            x_2 = self.layer4(x_2)
-            x_3 = self.layer4(x_3)
+            # print("X (video classification) after conv5:", x_1.size())
+
 
             if self.conv_class:
 
                 x_1 = self.avgpool(x_1)
-                x_2 = self.avgpool(x_2)
-                x_3 = self.avgpool(x_3)
 
-                # indices = Variable(torch.from_numpy(np.array([12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0])).long().cuda())
-                # x_3 = torch.index_select(x_3, 2, indices)
-                # print("x_3 now", x_3.size())
+                # print("X (video classification) after avgpool:", x_1.size())
+                
+                x_bin = self.avgpool(x_bin)
+
+                # print("X_bin (forward backward) after avgpool:", x_bin.size())
 
                 x_1 = self.classifier(x_1)
-                x_2 = self.bin_classifier(x_2)
-                x_3 = self.bin_classifier(x_3)
+
+                # print("X (video classification) after conv classifier:", x_1.size())
+
+                x_bin = self.bin_classifier(x_bin)
+
+                # print("X_bin (forward backward) after conv classifier:", x_bin.size())
                 
                 x_1 = x_1.squeeze(3)
+                # print("X (video classification) after squeeze:", x_1.size())
                 x_1 = x_1.squeeze(3)
+                # print("X (video classification) after squeeze:", x_1.size())
                 x_1 = x_1.mean(2)
+                # print("X (video classification) after mean:", x_1.size())
 
-                x_2 = x_2.squeeze(3)
-                x_2 = x_2.squeeze(3)
-                x_2 = x_2.mean(2)
+                x_bin = x_bin.squeeze(3)
+                # print("X_bin (forward backward) after squeeze:", x_bin.size())
+                x_bin = x_bin.squeeze(3)
+                # print("X_bin (forward backward) after squeeze:", x_bin.size())
+                
+                x_bin = x_bin.mean(2)
+                
+                # print("X_bin (forward backward) after squeeze:", x_bin.size())
 
-                x_3 = x_3.squeeze(3)
-                x_3 = x_3.squeeze(3)
-                x_3 = x_3.mean(2)
+                # print("X_bin (forward backward) after all:", x_bin.size())
 
             else:
                 x_1 = self.avgpool(x_1)
                 x_reshape = x_1.view(x_1.size(0), -1)
                 x_1 = self.fc(x_reshape)
 
-                x_2 = self.avgpool(x_2)
-                x_2reshape = x_2.view(x_2.size(0), -1)
-                x_2 = self.fc(x_2reshape)
+                x_bin = self.avgpool(x_bin)
+                x_binreshape = x_bin.view(x_bin.size(0), -1)
+                x_bin = self.fc(x_binreshape)
 
-                x_3 = self.avgpool(x_3)
-                x_3reshape = x_3.view(x_3.size(0), -1)
-                x_3 = self.fc(x_3reshape)
+            # print("Output for video classification tensor", x_1.size())
+            # print("Output for Forward backward tensor", x_bin.size())
 
-            x_bin = torch.cat((x_2, x_3), 0)
-            # print("Forward backward tensor", x_bin.size())
+            # exit()
 
             return x, x_1, x_bin, forward_backward_labels
 

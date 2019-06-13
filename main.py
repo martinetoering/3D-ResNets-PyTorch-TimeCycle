@@ -363,14 +363,12 @@ if __name__ == '__main__':
             num_workers=opt.n_threads,
             pin_memory=True)
         
-        if opt.general_eval_file:
-            val_json_name = 'temp'
+        if not opt.no_train and opt.val:
+            epoch = opt.n_epochs
         else:
-            if not opt.no_train and opt.val:
-                epoch = opt.n_epochs
-            else:
-                epoch = opt.begin_epoch - 1
-            val_json_name = str(epoch)
+            epoch = opt.begin_epoch - 1
+        
+        val_json_name = str(epoch)
 
         test.test(test_loader, model, opt, test_data.class_names, val_json_name)
 
@@ -390,13 +388,6 @@ if __name__ == '__main__':
         print("File:", eval_path)
 
         prediction_file = os.path.join(opt.result_path, 'val_{}.json'.format(val_json_name))
-        general_output_path = os.path.join(opt.result_path, 'results_all.txt')
         subset = "validation"
 
-        if opt.general_eval_file:
-            f = open(general_output_path, 'w')
-            f.write("Results \n")
-            f.write("Epoch \t Accuracy \t Error \n")
-            f.close()
-
-        eval_hmdb51.eval_hmdb51(eval_path, opt.annotation_path, prediction_file, subset, opt.top_k, general_output_path, epoch, opt.general_eval_file)
+        eval_hmdb51.eval_hmdb51(eval_path, opt.annotation_path, prediction_file, subset, opt.top_k, epoch)
