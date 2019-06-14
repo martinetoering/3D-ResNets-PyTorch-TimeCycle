@@ -160,7 +160,7 @@ def test_and_eval(file, original_result_path, number, results_file_path):
     epoch, accuracy1, error1 = eval_hmdb51.eval_hmdb51(None, opt.annotation_path, prediction_file, subset, opt.top_k, number)
     epoch, accuracy5, error5 = eval_hmdb51.eval_hmdb51(None, opt.annotation_path, prediction_file, subset, 5, number)
 
-    eval_results_1[epoch] = [accuracy5, error1]
+    eval_results_1[epoch] = [accuracy1, error1]
     eval_results_5[epoch] = [accuracy5, error5]
 
     return eval_results_1, eval_results_5
@@ -211,7 +211,7 @@ if __name__ == '__main__':
             number = file.split("_")[1]
             number = int(number.split(".")[0])
             
-            results_file = "results_{}.txt".format(number)
+            results_file = "eval_1_checkpoint_{}.txt".format(number)
             results_file_path = os.path.join(original_result_path, results_file)
         
             if number >= int(epoch1):
