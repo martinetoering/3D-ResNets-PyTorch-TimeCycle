@@ -16,11 +16,18 @@ python3 test_all.py <checkpoint_folder_path>
 
 
 
-____________________
+_____________________________________________________________________________
 
 
-# 3D ResNets for Action Recognition
+# Multi-Branch Direction-Action Recognition (DAR) Network 
 
-# TimeCycle
+![](3D-ResNets-PyTorch-TimeCycle/master/figures/Multi-branch_network.png)
+
+
+Acknowledgements
+ 
+3D ResNets for Action Recognition
+
+TimeCycle
 
 
