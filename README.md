@@ -1,17 +1,17 @@
-Run experiment
+# Video Classification from scratch
+## Thesis project
 
-```
-python3 main.py --annotation_path hmdb51_1.json --list hmdb_1.txt \ 
-&& python3 main.py --annotation_path hmdb51_2.json --list hmdb_2.txt \ 
-&& python3 main.py --annotation_path hmdb51_3.json --list hmdb_3.txt
-```
-
-python3 main.py --timecycle_weight 50 --binary_class_weight 4 --annotation_path hmdb51_2.json --list hmdb_2.txt --result_path result --videoLen 3 --frame_gap 4 --predDistance 0 --val
-
-python3 3D-ResNets-PyTorch-TimeCycle/main.py --timecycle_weight 25 --binary_class_weight 2 --annotation_path hmdb51_1.json --list hmdb_1.txt --result_path res50_bin_test --videoLen 3 --frame_gap 4 --predDistance 0 --val
+![](3D-ResNets-PyTorch-TimeCycle/master/figures/Multi-branch_network.png)
 
 
-python3 test_all.py <checkpoint_folder_path>
+
+### Preprocess - Follow 3D-ResNets-PyTorch and change and run utils/generate_filelist.py
+
+
+### Train ResNet 50 model on split 1 of HMDB-51
+
+python3 main.py --timecycle_weight 25 --binary_class_weight 2 --annotation_path hmdb51_1.json --list hmdb_1.txt --result_path res50_bin_test --videoLen 3 --frame_gap 4 --predDistance 0 --gpu_id 0
+
 
 
 
@@ -19,15 +19,10 @@ python3 test_all.py <checkpoint_folder_path>
 _____________________________________________________________________________
 
 
-# Multi-Branch Direction-Action Recognition (DAR) Network 
-
-![](3D-ResNets-PyTorch-TimeCycle/master/figures/Multi-branch_network.png)
-
-
 Acknowledgements
  
-3D ResNets for Action Recognition
+3D ResNets for Action Recognition: https://github.com/kenshohara/3D-ResNets-PyTorch
 
-TimeCycle
+TimeCycle: https://github.com/martinetoering/3D-ResNets-PyTorch-TimeCycle
 
 
